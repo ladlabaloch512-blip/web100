@@ -33,8 +33,9 @@ from src.ui.dashboard import ControlPanel
 from src.licensing import verify_license, show_activation_screen
 
 if __name__ == "__main__":
-    if not verify_license():
-        show_activation_screen()
+    is_valid, msg = verify_license()
+    if not is_valid:
+        show_activation_screen(msg)
         sys.exit(0)
 
     app = ControlPanel()
