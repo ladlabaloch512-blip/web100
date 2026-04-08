@@ -39,8 +39,10 @@ def monitor_messenger(driver, p_name, state):
 
         # === THE NO-RELOAD DYNAMIC LOOP (Prevents Filter Reset) ===
         processed_hrefs = set()
+        collected_chats = []
 
-        while len(processed_hrefs) < 5:
+        # We process up to 10 unread chats per session
+        while len(processed_hrefs) < 10:
             if state.GLOBAL_STOP: break
 
             # Fetch fresh links every iteration to avoid StaleElement Reference
@@ -147,39 +149,64 @@ def monitor_messenger(driver, p_name, state):
                     print(f"⚠️ [Could not load chat history: {history_error}]")
                     recent_msgs = []
 
-                # Report to global UI queue instead of using `input()`
-                alert = {
+                # We save this chat offline instead of blocking
+                chat_data = {
                     "profile": p_name,
                     "target": target_name,
+                    "url": target_href,
                     "messages": recent_msgs,
-                    "driver": driver, # Store driver ref to reply directly from UI
-                    "handled": False
                 }
-                state.MESSENGER_ALERTS.append(alert)
-                state.NEW_MESSAGES_EVENT = True
-
+                collected_chats.append(chat_data)
                 send_discord_alert(state.DISCORD_WEBHOOK, p_name, target_name, recent_msgs)
-
-                print(f"🔔 ACTION REQUIRED IN UI FOR {p_name}!")
-
-                # Wait for the UI to handle it (or timeout to skip)
-                wait_time = 0
-                max_wait = 300 # 5 minutes wait per message
-                while not alert["handled"] and wait_time < max_wait and not state.GLOBAL_STOP:
-                    time.sleep(2)
-                    wait_time += 2
-
-                if alert.get("reply_text") and not state.GLOBAL_STOP:
-                    msg_box = wait_and_find(driver, "//div[@role='textbox']", state, timeout=5)
-                    human_type(msg_box, alert["reply_text"], fast=True, state_module=state)
-                    time.sleep(0.5)
-                    msg_box.send_keys(Keys.ENTER)
-                    print(f"✅ [{p_name}] Message delivered!")
-                    time.sleep(3) # Wait for message to send before moving to next chat
 
             except Exception as inner_e:
                 print(f"⚠️ [{p_name}] Skipped chat due to error: {inner_e}")
                 continue
 
+        # At the end of scraping this profile, push to the global state PENDING_MESSAGES
+        if collected_chats:
+            if not hasattr(state, "PENDING_MESSAGES"):
+                state.PENDING_MESSAGES = []
+
+            # Avoid adding duplicates
+            existing_urls = [msg["url"] for msg in state.PENDING_MESSAGES]
+            for chat in collected_chats:
+                if chat["url"] not in existing_urls:
+                    state.PENDING_MESSAGES.append(chat)
+
+            state.NEW_MESSAGES_EVENT = True
+            print(f"✅ [{p_name}] Saved {len(collected_chats)} unread chats for offline drafting.")
+        else:
+            print(f"✅ [{p_name}] No unread chats found.")
+
     except Exception as e:
         print(f"❌ [{p_name}] Inbox monitoring failed: {e}")
+
+def send_messenger_reply(driver, p_name, state, details):
+    """
+    Called by the worker to send a reply to a specific chat and close.
+    details should have: 'url' and 'reply_text'
+    """
+    try:
+        url = details.get("url")
+        reply_text = details.get("reply_text")
+
+        if not url or not reply_text:
+            return
+
+        print(f"[{p_name}] Opening chat to send reply...")
+        driver.get(url)
+        wait_for_page_load(driver, state)
+        time.sleep(5)
+
+        if state.GLOBAL_STOP:
+            return
+
+        msg_box = wait_and_find(driver, "//div[@role='textbox']", state, timeout=10)
+        human_type(msg_box, reply_text, fast=True, state_module=state)
+        time.sleep(0.5)
+        msg_box.send_keys(Keys.ENTER)
+        print(f"✅ [{p_name}] Message delivered!")
+        time.sleep(4) # Wait for message to be sent
+    except Exception as e:
+        print(f"❌ [{p_name}] Failed to send reply: {e}")

@@ -3,7 +3,7 @@ import src.state as state
 from src.utils.system_utils import check_login_status, force_kill_browser, smart_cleanup
 from src.browser.launcher import launch_browser
 from src.automation.facebook_core import perform_login, perform_listing, perform_manual
-from src.automation.messenger import monitor_messenger
+from src.automation.messenger import monitor_messenger, send_messenger_reply
 
 def worker_task(p_name, task_type, details=None, email=None, pwd=None, progress_callback=None):
     if state.GLOBAL_STOP:
@@ -18,6 +18,8 @@ def worker_task(p_name, task_type, details=None, email=None, pwd=None, progress_
             perform_listing(driver, details, p_name, state)
         elif task_type == "messenger":
             monitor_messenger(driver, p_name, state)
+        elif task_type == "messenger_reply":
+            send_messenger_reply(driver, p_name, state, details)
         elif task_type == "manual":
             perform_manual(driver, p_name, details.get("url", "https://web.facebook.com"), state)
     except Exception as e:

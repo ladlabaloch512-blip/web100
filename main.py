@@ -36,7 +36,9 @@ if __name__ == "__main__":
     is_valid, msg = verify_license()
     if not is_valid:
         show_activation_screen(msg)
-        sys.exit(0)
+        is_valid, _ = verify_license()
+        if not is_valid:
+            sys.exit(0)
 
     app = ControlPanel()
     app.root.mainloop()

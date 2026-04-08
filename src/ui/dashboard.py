@@ -86,8 +86,38 @@ class ControlPanel:
         self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
         scrollbar.pack(side=RIGHT, fill=Y)
 
+        # Create Notebook for Main Tabs
+        self.notebook = ttk.Notebook(right_pane)
+        self.notebook.pack(fill=BOTH, expand=True)
+
+        self.tab_dashboard = Frame(self.notebook, bg=state.BG_APP)
+        self.notebook.add(self.tab_dashboard, text=" Dashboard ")
+
+        self.tab_messenger = Frame(self.notebook, bg=state.BG_APP)
+        self.notebook.add(self.tab_messenger, text=" Messenger Hub ")
+
+        scanner_frame = Frame(self.tab_dashboard, bg=state.BG_PANEL, bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)
+        scanner_frame.pack(fill=BOTH, expand=True, pady=(0, 15))
+
+        stf = Frame(scanner_frame, bg=state.BG_PANEL)
+        stf.pack(fill=X, pady=10, padx=15)
+        Label(stf, text="📋 PROFILE DIRECTORY (SCANNER)", font=("Segoe UI", 13, "bold"), fg=state.FG_TEXT, bg=state.BG_PANEL).pack(side=LEFT)
+        HoverButton(stf, text="🔄 Refresh", hover_color="#CBD5E1", command=self.refresh_profiles, bg="#E2E8F0", fg=state.FG_TEXT, font=("Segoe UI", 9, "bold"), relief="flat", padx=10, cursor="hand2").pack(side=RIGHT, padx=(5,0))
+        HoverButton(stf, text="Select All", hover_color="#CBD5E1", command=self.select_all, bg="#E2E8F0", fg=state.FG_TEXT, font=("Segoe UI", 9, "bold"), relief="flat", padx=10, cursor="hand2").pack(side=RIGHT)
+
+        canvas_frame = Frame(scanner_frame, bg=state.BG_PANEL)
+        canvas_frame.pack(fill=BOTH, expand=True, padx=15, pady=(0, 15))
+        self.canvas = Canvas(canvas_frame, bg=state.BG_PANEL, highlightthickness=0)
+        scrollbar = Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = Frame(self.canvas, bg=state.BG_PANEL)
+        self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=scrollbar.set)
+        self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
+        scrollbar.pack(side=RIGHT, fill=Y)
+
         # System Resource Monitor
-        self.sys_frame = Frame(right_pane, bg=state.BG_PANEL, bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)
+        self.sys_frame = Frame(self.tab_dashboard, bg=state.BG_PANEL, bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)
         self.sys_frame.pack(fill=X, pady=(0, 15))
         sys_inner = Frame(self.sys_frame, bg=state.BG_PANEL)
         sys_inner.pack(fill=X, padx=15, pady=10)
@@ -97,7 +127,7 @@ class ControlPanel:
         self.lbl_ram = Label(sys_inner, text="RAM: 0%", font=("Segoe UI", 10, "bold"), fg=state.BTN_PURPLE, bg=state.BG_PANEL)
         self.lbl_ram.pack(side=LEFT, padx=10)
 
-        queue_frame = Frame(right_pane, bg=state.BG_PANEL, bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)
+        queue_frame = Frame(self.tab_dashboard, bg=state.BG_PANEL, bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)
         queue_frame.pack(fill=X)
         qtf = Frame(queue_frame, bg=state.BG_PANEL)
         qtf.pack(fill=X, padx=15, pady=5)
@@ -118,6 +148,8 @@ class ControlPanel:
 
         if not os.path.exists(state.BASE_PATH):
             os.makedirs(state.BASE_PATH)
+
+        self.build_messenger_tab()
 
         self.refresh_profiles()
         self.update_queue_display()
@@ -182,10 +214,143 @@ class ControlPanel:
     def check_new_messages(self):
         if state.NEW_MESSAGES_EVENT:
             play_success_sound()
-            if hasattr(self, 'msg_hub') and self.msg_hub.winfo_exists():
-                self.refresh_messenger_hub()
+            self.refresh_messenger_hub()
             state.NEW_MESSAGES_EVENT = False
         self.root.after(2000, self.check_new_messages)
+
+    def build_messenger_tab(self):
+        # Left Panel for Profiles
+        self.msg_left_pane = Frame(self.tab_messenger, bg=state.BG_PANEL, bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1, width=250)
+        self.msg_left_pane.pack(side=LEFT, fill=Y, padx=(0, 15), pady=15)
+        self.msg_left_pane.pack_propagate(False)
+
+        Label(self.msg_left_pane, text="📬 INBOX PROFILES", font=("Segoe UI", 12, "bold"), fg=state.FG_TEXT, bg=state.BG_PANEL).pack(pady=15)
+
+        self.msg_profiles_canvas = Canvas(self.msg_left_pane, bg=state.BG_PANEL, highlightthickness=0)
+        self.msg_profiles_scrollbar = Scrollbar(self.msg_left_pane, orient="vertical", command=self.msg_profiles_canvas.yview)
+        self.msg_profiles_inner = Frame(self.msg_profiles_canvas, bg=state.BG_PANEL)
+
+        self.msg_profiles_inner.bind("<Configure>", lambda e: self.msg_profiles_canvas.configure(scrollregion=self.msg_profiles_canvas.bbox("all")))
+        self.msg_profiles_canvas.create_window((0, 0), window=self.msg_profiles_inner, anchor="nw")
+        self.msg_profiles_canvas.configure(yscrollcommand=self.msg_profiles_scrollbar.set)
+
+        self.msg_profiles_canvas.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
+        self.msg_profiles_scrollbar.pack(side=RIGHT, fill=Y)
+
+        # Right Panel for Chats
+        self.msg_right_pane = Frame(self.tab_messenger, bg=state.BG_PANEL, bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)
+        self.msg_right_pane.pack(side=RIGHT, fill=BOTH, expand=True, pady=15)
+
+        self.msg_chat_title = Label(self.msg_right_pane, text="Select a profile to view unread chats", font=("Segoe UI", 14, "bold"), bg=state.BG_PANEL, fg=state.BTN_BLUE)
+        self.msg_chat_title.pack(pady=15)
+
+        self.msg_canvas = Canvas(self.msg_right_pane, bg=state.BG_PANEL, highlightthickness=0)
+        self.msg_scrollbar = Scrollbar(self.msg_right_pane, orient="vertical", command=self.msg_canvas.yview)
+        self.msg_inner_frame = Frame(self.msg_canvas, bg=state.BG_PANEL)
+
+        self.msg_inner_frame.bind("<Configure>", lambda e: self.msg_canvas.configure(scrollregion=self.msg_canvas.bbox("all")))
+        self.msg_canvas.create_window((0, 0), window=self.msg_inner_frame, anchor="nw")
+        self.msg_canvas.configure(yscrollcommand=self.msg_scrollbar.set)
+
+        self.msg_canvas.pack(side=LEFT, fill=BOTH, expand=True, padx=10, pady=10)
+        self.msg_scrollbar.pack(side=RIGHT, fill=Y)
+
+        self.active_messenger_profile = None
+
+    def refresh_messenger_hub(self):
+        if not hasattr(self, 'msg_profiles_inner'): return
+
+        # We read from state.PENDING_MESSAGES
+        if not hasattr(state, "PENDING_MESSAGES"):
+            state.PENDING_MESSAGES = []
+
+        pending = state.PENDING_MESSAGES
+
+        # Group by profile
+        profiles_with_msgs = {}
+        for chat in pending:
+            p = chat["profile"]
+            profiles_with_msgs[p] = profiles_with_msgs.get(p, 0) + 1
+
+        # Clear left pane
+        for widget in self.msg_profiles_inner.winfo_children():
+            widget.destroy()
+
+        if not profiles_with_msgs:
+            Label(self.msg_profiles_inner, text="No unread chats.", fg="#94A3B8", bg=state.BG_PANEL).pack(pady=20)
+        else:
+            for p, count in profiles_with_msgs.items():
+                btn_text = f"{p} ({count})"
+                color = state.BTN_BLUE if p == self.active_messenger_profile else "#E2E8F0"
+                fg_color = "white" if p == self.active_messenger_profile else state.FG_TEXT
+
+                btn = HoverButton(self.msg_profiles_inner, text=btn_text, hover_color=state.BTN_BLUE_HOVER,
+                                  command=lambda p_name=p: self.select_messenger_profile(p_name),
+                                  bg=color, fg=fg_color, font=("Segoe UI", 10, "bold"), relief="flat", cursor="hand2")
+                btn.pack(fill=X, pady=5, padx=5)
+
+        # Refresh right pane
+        self.select_messenger_profile(self.active_messenger_profile)
+
+    def select_messenger_profile(self, p_name):
+        self.active_messenger_profile = p_name
+
+        for widget in self.msg_inner_frame.winfo_children():
+            widget.destroy()
+
+        if not p_name:
+            self.msg_chat_title.config(text="Select a profile to view unread chats")
+            return
+
+        self.msg_chat_title.config(text=f"Inbox: {p_name}")
+
+        chats = [c for c in getattr(state, "PENDING_MESSAGES", []) if c["profile"] == p_name]
+
+        if not chats:
+            Label(self.msg_inner_frame, text="No pending messages for this profile.", bg=state.BG_PANEL, fg="#94A3B8", font=("Segoe UI", 12)).pack(pady=50)
+            # Re-render left panel to update selection color
+            # We don't call refresh_messenger_hub directly to avoid recursion,
+            # but setting active profile might trigger it. We just leave it.
+            return
+
+        for idx, chat in enumerate(chats):
+            card = Frame(self.msg_inner_frame, bg="#F8FAFC", bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)
+            card.pack(fill=X, pady=10, padx=5)
+
+            header = Frame(card, bg="#E2E8F0")
+            header.pack(fill=X)
+            Label(header, text=f"💬 {chat['target']}", font=("Segoe UI", 11, "bold"), bg="#E2E8F0", fg=state.FG_TEXT).pack(side=LEFT, padx=10, pady=5)
+
+            msg_area = Frame(card, bg="#F8FAFC")
+            msg_area.pack(fill=X, padx=10, pady=10)
+
+            for m in chat.get("messages", []):
+                Label(msg_area, text=m, bg="#F8FAFC", fg="#475569", font=("Segoe UI", 10), wraplength=450, justify=LEFT).pack(anchor="w")
+
+            reply_frame = Frame(card, bg="#F8FAFC")
+            reply_frame.pack(fill=X, padx=10, pady=(0,10))
+
+            reply_entry = Entry(reply_frame, font=("Segoe UI", 10), width=40)
+            reply_entry.pack(side=LEFT, fill=X, expand=True, padx=(0,10))
+
+            HoverButton(reply_frame, text="📤 Send Reply", hover_color=state.BTN_GREEN_HOVER,
+                        command=lambda c=chat, e=reply_entry: self.submit_reply(c, e),
+                        bg=state.BTN_GREEN, fg="white", font=("Segoe UI", 9, "bold"), relief="flat", cursor="hand2").pack(side=RIGHT)
+
+    def submit_reply(self, chat_obj, entry_widget):
+        text = entry_widget.get().strip()
+        if not text:
+            pass
+
+        if text:
+            state.TASK_QUEUE.append((chat_obj["profile"], "messenger_reply", {"url": chat_obj["url"], "reply_text": text}, None, None))
+            self.update_queue_display()
+            show_alert(self.root, "Reply Queued", f"Reply to {chat_obj['target']} queued. Run Master Queue to send.", "success")
+
+        if hasattr(state, "PENDING_MESSAGES") and chat_obj in state.PENDING_MESSAGES:
+            state.PENDING_MESSAGES.remove(chat_obj)
+
+        self.refresh_messenger_hub()
 
     def update_system_resources(self):
         try:
@@ -294,80 +459,10 @@ class ControlPanel:
             show_alert(self.root, "Deleted", f"{p_name} was removed.", "success")
 
     def open_messenger_hub(self):
-        if hasattr(self, 'msg_hub') and self.msg_hub.winfo_exists():
-            self.msg_hub.lift()
-            return
+        # We now have an embedded Messenger Hub tab, so just select it
+        if hasattr(self, 'notebook'):
+            self.notebook.select(self.tab_messenger)
 
-        self.msg_hub = Toplevel(self.root)
-        self.msg_hub.title("Combined Live Messages Hub")
-        self.msg_hub.geometry("800x600")
-        self.msg_hub.configure(bg=state.BG_APP)
-        Frame(self.msg_hub, bg="#4338CA", height=6).pack(fill=X, side=TOP)
-
-        Label(self.msg_hub, text="📬 LIVE MESSENGER INBOX", font=("Segoe UI", 16, "bold"), bg=state.BG_APP, fg=state.FG_TEXT).pack(pady=15)
-
-        self.msg_canvas_frame = Frame(self.msg_hub, bg=state.BG_PANEL, bd=1, relief="solid")
-        self.msg_canvas_frame.pack(fill=BOTH, expand=True, padx=20, pady=(0,20))
-
-        self.msg_canvas = Canvas(self.msg_canvas_frame, bg=state.BG_PANEL, highlightthickness=0)
-        self.msg_scrollbar = Scrollbar(self.msg_canvas_frame, orient="vertical", command=self.msg_canvas.yview)
-        self.msg_inner_frame = Frame(self.msg_canvas, bg=state.BG_PANEL)
-
-        self.msg_inner_frame.bind("<Configure>", lambda e: self.msg_canvas.configure(scrollregion=self.msg_canvas.bbox("all")))
-        self.msg_canvas.create_window((0, 0), window=self.msg_inner_frame, anchor="nw")
-        self.msg_canvas.configure(yscrollcommand=self.msg_scrollbar.set)
-
-        self.msg_canvas.pack(side=LEFT, fill=BOTH, expand=True)
-        self.msg_scrollbar.pack(side=RIGHT, fill=Y)
-
-        self.refresh_messenger_hub()
-
-    def submit_reply(self, alert_obj, entry_widget, container_widget):
-        text = entry_widget.get().strip()
-        alert_obj["reply_text"] = text
-        alert_obj["handled"] = True
-        container_widget.destroy()
-        show_alert(self.msg_hub, "Action Recorded", "Reply queued for transmission. If left blank, chat will be skipped.", "success")
-
-    def refresh_messenger_hub(self):
-        if not hasattr(self, 'msg_inner_frame'): return
-
-        for widget in self.msg_inner_frame.winfo_children():
-            widget.destroy()
-
-        pending_alerts = [a for a in state.MESSENGER_ALERTS if not a["handled"]]
-
-        if not pending_alerts:
-            Label(self.msg_inner_frame, text="No new messages awaiting your response.", bg=state.BG_PANEL, fg="#94A3B8", font=("Segoe UI", 12, "bold")).pack(pady=50)
-            return
-
-        for idx, alert in enumerate(pending_alerts):
-            card = Frame(self.msg_inner_frame, bg="#F8FAFC", bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)
-            card.pack(fill=X, pady=10, padx=10)
-
-            header = Frame(card, bg="#E0E7FF")
-            header.pack(fill=X)
-            Label(header, text=f"Profile: {alert['profile']}", font=("Segoe UI", 10, "bold"), bg="#E0E7FF", fg="#3730A3").pack(side=LEFT, padx=10, pady=5)
-            Label(header, text=f"Client: {alert['target']}", font=("Segoe UI", 10, "bold"), bg="#E0E7FF", fg="#4338CA").pack(side=RIGHT, padx=10, pady=5)
-
-            msg_area = Frame(card, bg="#F8FAFC")
-            msg_area.pack(fill=X, padx=15, pady=10)
-
-            if alert["messages"]:
-                for m in alert["messages"]:
-                    Label(msg_area, text=f"💬 {m}", font=("Segoe UI", 9), bg="#F8FAFC", fg=state.FG_TEXT, wraplength=700, justify="left").pack(anchor="w")
-            else:
-                Label(msg_area, text="[No text found. Probably an image or sticker.]", font=("Segoe UI", 9, "italic"), bg="#F8FAFC", fg="#64748B").pack(anchor="w")
-
-            reply_area = Frame(card, bg="#F8FAFC")
-            reply_area.pack(fill=X, padx=15, pady=(0,15))
-
-            Label(reply_area, text="Reply:", bg="#F8FAFC", font=("Segoe UI", 9, "bold")).pack(side=LEFT)
-            reply_ent = Entry(reply_area, width=60, font=("Segoe UI", 10))
-            reply_ent.pack(side=LEFT, padx=10)
-
-            HoverButton(reply_area, text="Send", command=lambda a=alert, e=reply_ent, c=card: self.submit_reply(a, e, c), bg=state.BTN_GREEN, hover_color=state.BTN_GREEN_HOVER, fg="white", font=("Segoe UI", 9, "bold"), relief="flat", cursor="hand2").pack(side=LEFT, padx=5)
-            HoverButton(reply_area, text="Skip", command=lambda a=alert, e=Entry(self.root), c=card: self.submit_reply(a, e, c), bg=state.BTN_RED, hover_color=state.BTN_RED_HOVER, fg="white", font=("Segoe UI", 9, "bold"), relief="flat", cursor="hand2").pack(side=LEFT)
 
     def open_single_listing_form(self, p_name):
         # We temporarily set the profile selection to just this one profile to reuse the multi-listing form
