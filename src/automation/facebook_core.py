@@ -1,0 +1,199 @@
+import time
+import random
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from src.automation.selenium_utils import human_type, wait_for_page_load, wait_and_find, wait_and_click, js_click
+
+def perform_manual(driver, p_name, target_url, state):
+    try:
+        driver.get(target_url)
+        print(f"[{p_name}] Browser opened manually.")
+        while len(driver.window_handles) > 0:
+            if state.GLOBAL_STOP:
+                break
+            time.sleep(2)
+    except:
+        pass
+
+def perform_login(driver, email, password, p_name, state):
+    driver.get("https://web.facebook.com")
+    wait_for_page_load(driver, state)
+    time.sleep(3)
+    if state.GLOBAL_STOP:
+        return False
+
+    try:
+        email_field = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.NAME, "email")))
+        print(f"[{p_name}] Logging in...")
+        human_type(email_field, email, False, state)
+        pass_field = driver.find_element(By.NAME, "pass")
+        human_type(pass_field, password, False, state)
+        if state.GLOBAL_STOP:
+            return False
+        pass_field.send_keys(Keys.ENTER)
+        time.sleep(7)
+
+        max_wait_time = 300
+        start_time = time.time()
+        while time.time() - start_time < max_wait_time:
+            if state.GLOBAL_STOP:
+                return False
+            current_url = driver.current_url.lower()
+            try:
+                body_text = driver.find_element(By.TAG_NAME, "body").text.lower()
+            except:
+                body_text = ""
+
+            if "suspended" in body_text or "checkpoint/disabled" in current_url:
+                print(f"❌ [{p_name}] Account Suspended: {email}")
+                return False
+            if "login" in current_url and "incorrect" in body_text:
+                print(f"❌ [{p_name}] Invalid credentials: {email}")
+                return False
+            if "checkpoint" in current_url or "two_step" in current_url:
+                print(f"⚠️ [{p_name}] Captcha/2FA Required. Solve manually in browser...")
+                time.sleep(5)
+                continue
+            if "login" not in current_url and "checkpoint" not in current_url:
+                print(f"✅ [{p_name}] Login successful!")
+                return True
+            time.sleep(2)
+        return False
+    except:
+        if "facebook.com" in driver.current_url and "login" not in driver.current_url.lower():
+            print(f"✅ [{p_name}] Profile is already logged in!")
+            return True
+        else:
+            print(f"❌ [{p_name}] Failed to load Facebook login page.")
+            return False
+
+def perform_listing(driver, details, p_name, state):
+    try:
+        print(f"[{p_name}] Constructing Marketplace Listing...")
+        driver.get("https://web.facebook.com/marketplace/create/item")
+        wait_for_page_load(driver, state)
+        time.sleep(4)
+
+        wait_and_find(driver, "//input[@type='file']", state).send_keys("\n".join(details['images']))
+        time.sleep(5)
+
+        human_type(wait_and_find(driver, "//label[@aria-label='Title']//input | //span[contains(text(), 'Title')]/following::input[1]", state), details['title'], False, state)
+        human_type(wait_and_find(driver, "//label[@aria-label='Price']//input | //span[contains(text(), 'Price')]/following::input[1]", state), details['price'], False, state)
+
+        wait_and_click(driver, "//label[@aria-label='Category'] | //span[contains(text(), 'Category')]/following::div[1]", state)
+        time.sleep(1.5)
+        js_click(driver, f'//span[text()="{details["category"]}"]', state)
+        time.sleep(1)
+
+        wait_and_click(driver, "//label[@aria-label='Condition'] | //span[contains(text(), 'Condition')]/following::div[1]", state)
+        time.sleep(1.5)
+        js_click(driver, f'//span[text()="{details["condition"]}"]', state)
+        time.sleep(1)
+
+        try:
+            more_btn_xpath = "//span[contains(text(), 'More details') or contains(text(), 'More Details')] | //div[@role='button']//span[contains(text(), 'More details')]"
+            more_btn = wait_and_find(driver, more_btn_xpath, state, timeout=5)
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", more_btn)
+            time.sleep(1)
+            driver.execute_script("arguments[0].click();", more_btn)
+            time.sleep(2)
+        except:
+            pass
+
+        try:
+            desc_box = wait_and_find(driver, "//label[@aria-label='Description']//textarea | //span[contains(text(), 'Description')]/following::textarea[1]", state, timeout=5)
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", desc_box)
+            human_type(desc_box, details['desc'], fast=True, state_module=state)
+            time.sleep(1)
+        except Exception as e:
+            print(f"[{p_name}] Description field skipped: {e}")
+
+        if details.get('availability') and details['availability'] != "List as Single Item":
+            try:
+                avail_box = wait_and_find(driver, "//label[@aria-label='Availability'] | //span[contains(text(), 'Availability')]/following::div[1]", state, timeout=5)
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", avail_box)
+                time.sleep(1)
+                avail_box.click()
+                time.sleep(1)
+                js_click(driver, f'//span[text()="{details["availability"]}"]', state)
+            except:
+                pass
+
+        if details.get('tags'):
+            try:
+                tag_box = wait_and_find(driver, "//label[@aria-label='Product tags']//textarea | //span[contains(text(), 'Product tags')]/following::textarea[1]", state, timeout=5)
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", tag_box)
+                human_type(tag_box, details['tags'], fast=True, state_module=state)
+                tag_box.send_keys(Keys.ENTER)
+            except:
+                pass
+
+        location_to_type = ""
+        if details.get('loc_type') == 'file' and details.get('loc_file'):
+            try:
+                with open(details['loc_file'], 'r') as f:
+                    locs = [l.strip() for l in f.readlines() if l.strip()]
+                location_to_type = random.choice(locs) if details.get('loc_random') else locs[0]
+            except:
+                pass
+        else:
+            location_to_type = details.get('location', '')
+
+        if location_to_type:
+            try:
+                loc_box = wait_and_find(driver, "//label[@aria-label='Location']//input", state, timeout=5)
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", loc_box)
+                loc_box.send_keys(Keys.CONTROL + "a")
+                loc_box.send_keys(Keys.BACKSPACE)
+                human_type(loc_box, location_to_type, False, state)
+                time.sleep(3)
+                loc_box.send_keys(Keys.ARROW_DOWN)
+                loc_box.send_keys(Keys.ENTER)
+            except:
+                pass
+
+        if details.get('public_meetup'):
+            try: js_click(driver, "//span[text()='Public meetup']", state, timeout=3)
+            except: pass
+        if details.get('door_pickup'):
+            try: js_click(driver, "//span[text()='Door pickup']", state, timeout=3)
+            except: pass
+
+        time.sleep(2)
+        if not state.GLOBAL_STOP:
+            print(f"[{p_name}] Proceeding to Publish...")
+
+            # Auto delete old listings if configured
+            if details.get('auto_delete_old'):
+                print(f"[{p_name}] (Feature Placeholder) Scanning for duplicate listings to delete before publishing...")
+                time.sleep(2)
+
+            try:
+                next_btn_xpath = "//div[@aria-label='Next'] | //span[text()='Next'] | //div[@role='button']//span[text()='Next']"
+                next_btn = wait_and_find(driver, next_btn_xpath, state, timeout=10)
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", next_btn)
+                time.sleep(1)
+                driver.execute_script("arguments[0].click();", next_btn)
+                time.sleep(4)
+            except Exception as e:
+                print(f"[{p_name}] Next button issue: {e}")
+
+            try:
+                publish_btn_xpath = "//div[@aria-label='Publish'] | //span[text()='Publish'] | //div[@role='button']//span[contains(text(), 'Publish')]"
+                publish_btn = wait_and_find(driver, publish_btn_xpath, state, timeout=10)
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", publish_btn)
+                time.sleep(1)
+                driver.execute_script("arguments[0].click();", publish_btn)
+
+                print(f"✅ [{p_name}] Listing POSTED and PUBLISHED successfully!")
+                time.sleep(10)
+            except Exception as e:
+                print(f"❌ [{p_name}] Failed to click Publish: {e}")
+                time.sleep(15)
+
+    except Exception as e:
+        if not state.GLOBAL_STOP:
+            print(f"❌ [{p_name}] Error during listing: {e}")
+            time.sleep(15)
