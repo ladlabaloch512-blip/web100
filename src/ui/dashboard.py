@@ -703,9 +703,9 @@ class ControlPanel:
                     offline_profiles.append(p_name)
                 else:
                     # Actually open the browser and verify by looking at the page
-                    driver = launch_browser(p_name)
+                    driver = launch_browser(p_name, state.BASE_PATH, state)
                     driver.get("https://web.facebook.com")
-                    wait_for_page_load(driver)
+                    wait_for_page_load(driver, state)
                     time.sleep(3)
 
                     current_url = driver.current_url.lower()

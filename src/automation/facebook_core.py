@@ -70,130 +70,322 @@ def perform_login(driver, email, password, p_name, state):
             return False
 
 def perform_listing(driver, details, p_name, state):
+    print(f"🛒 [{p_name}] Starting API listing process...")
     try:
-        print(f"[{p_name}] Constructing Marketplace Listing...")
-        driver.get("https://web.facebook.com/marketplace/create/item")
+        # 1. Go directly to the Marketplace creation page
+        driver.get("https://www.facebook.com/marketplace/create/item")
         wait_for_page_load(driver, state)
-        time.sleep(4)
+        time.sleep(5) # Wait for DOM and cookies to load
 
-        wait_and_find(driver, "//input[@type='file']", state).send_keys("\n".join(details['images']))
-        time.sleep(5)
+        # Random delay as requested (3-5 seconds)
+        delay = random.uniform(3, 5)
+        print(f"⏳ [{p_name}] Applying random delay of {delay:.2f} seconds...")
+        time.sleep(delay)
 
-        human_type(wait_and_find(driver, "//label[@aria-label='Title']//input | //span[contains(text(), 'Title')]/following::input[1]", state), details['title'], False, state)
-        human_type(wait_and_find(driver, "//label[@aria-label='Price']//input | //span[contains(text(), 'Price')]/following::input[1]", state), details['price'], False, state)
+        # 2. Extract active session data (Session Hijacking)
+        print(f"🕵️ [{p_name}] Extracting Security Tokens & Routing Data...")
+        cookies, fb_dtsg, jazoest, lsd, profile_id, fb_env = _get_session_data(driver)
 
-        wait_and_click(driver, "//label[@aria-label='Category'] | //span[contains(text(), 'Category')]/following::div[1]", state)
-        time.sleep(1.5)
-        js_click(driver, f'//span[text()="{details["category"]}"]', state)
-        time.sleep(1)
+        if not fb_dtsg or not profile_id:
+            print(f"❌ [{p_name}] Failed to extract security tokens. Is account logged in?")
+            return False
 
-        wait_and_click(driver, "//label[@aria-label='Condition'] | //span[contains(text(), 'Condition')]/following::div[1]", state)
-        time.sleep(1.5)
-        js_click(driver, f'//span[text()="{details["condition"]}"]', state)
-        time.sleep(1)
+        session = requests.Session()
+        session.cookies.update(cookies)
+        # 🔥 NEW: Added Anti-Bot Headers (x-fb-lsd, x-asbd-id) and fixed Sec-Fetch-Site
+        session.headers.update({
+            "User-Agent": driver.execute_script("return navigator.userAgent;"),
+            "Referer": "https://www.facebook.com/marketplace/create/item",
+            "Origin": "https://www.facebook.com",
+            "Sec-Fetch-Site": "same-origin",
+            "X-FB-LSD": lsd,
+            "X-ASBD-ID": "359341"
+        })
 
-        try:
-            more_btn_xpath = "//span[contains(text(), 'More details') or contains(text(), 'More Details')] | //div[@role='button']//span[contains(text(), 'More details')]"
-            more_btn = wait_and_find(driver, more_btn_xpath, state, timeout=5)
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", more_btn)
+        # 3. Upload Images via API
+        photo_ids = []
+        for img_path in details.get('images', []):
+            if state.GLOBAL_STOP:
+                return False
+            print(f"📸 [{p_name}] Uploading image via API: {img_path}")
+            fbid = _api_upload_image(session, img_path, fb_dtsg, jazoest, lsd, profile_id)
+            if fbid:
+                photo_ids.append(fbid)
             time.sleep(1)
-            driver.execute_script("arguments[0].click();", more_btn)
-            time.sleep(2)
-        except:
-            pass
 
-        try:
-            desc_box = wait_and_find(driver, "//label[@aria-label='Description']//textarea | //span[contains(text(), 'Description')]/following::textarea[1]", state, timeout=5)
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", desc_box)
-            human_type(desc_box, details['desc'], fast=True, state_module=state)
-            time.sleep(1)
-        except Exception as e:
-            print(f"[{p_name}] Description field skipped: {e}")
+        if not photo_ids:
+            print(f"⚠️ [{p_name}] No images were uploaded successfully. Aborting.")
+            return False
 
-        if details.get('availability') and details['availability'] != "List as Single Item":
-            try:
-                avail_box = wait_and_find(driver, "//label[@aria-label='Availability'] | //span[contains(text(), 'Availability')]/following::div[1]", state, timeout=5)
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", avail_box)
-                time.sleep(1)
-                avail_box.click()
-                time.sleep(1)
-                js_click(driver, f'//span[text()="{details["availability"]}"]', state)
-            except:
-                pass
+        if state.GLOBAL_STOP:
+            return False
 
-        if details.get('tags'):
-            try:
-                tag_box = wait_and_find(driver, "//label[@aria-label='Product tags']//textarea | //span[contains(text(), 'Product tags')]/following::textarea[1]", state, timeout=5)
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", tag_box)
-                human_type(tag_box, details['tags'], fast=True, state_module=state)
-                tag_box.send_keys(Keys.ENTER)
-            except:
-                pass
+        # 4. Save Listing as Draft via JS Fetch Injection
+        print(f"🚀 [{p_name}] Saving listing as Draft via Browser XHR Injection...")
 
-        location_to_type = ""
-        if details.get('loc_type') == 'file' and details.get('loc_file'):
-            try:
-                with open(details['loc_file'], 'r') as f:
-                    locs = [l.strip() for l in f.readlines() if l.strip()]
-                location_to_type = random.choice(locs) if details.get('loc_random') else locs[0]
-            except:
-                pass
+        # Pass the driver instead of session
+        res_json = _api_publish_listing(driver, details, photo_ids, fb_dtsg, jazoest, lsd, profile_id)
+
+        # Check the JSON directly
+        if "errors" in res_json:
+            print(f"❌ [{p_name}] GraphQL Rejected the Request! FB says:")
+            print(json.dumps(res_json["errors"], indent=2))
+            return False
+
+        elif "data" in res_json:
+            print(f"✅ [{p_name}] Automation finished! FB confirmed Draft saved.")
+            return True
+
         else:
-            location_to_type = details.get('location', '')
+            print(f"⚠️ [{p_name}] Unknown response format.")
+            print(res_json)
+            return False
+    except Exception as e:
+        print(f"⚠️ [{p_name}] Error during API listing: {e}")
+        return False
+import re
+import json
+import time
+import random
+import urllib.parse
+import requests
 
-        if location_to_type:
-            try:
-                loc_box = wait_and_find(driver, "//label[@aria-label='Location']//input", state, timeout=5)
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", loc_box)
-                loc_box.send_keys(Keys.CONTROL + "a")
-                loc_box.send_keys(Keys.BACKSPACE)
-                human_type(loc_box, location_to_type, False, state)
-                time.sleep(3)
-                loc_box.send_keys(Keys.ARROW_DOWN)
-                loc_box.send_keys(Keys.ENTER)
-            except:
-                pass
+def _get_session_data(driver):
+    """Extracts cookies, security tokens, and internal SiteData directly from the browser."""
+    cookies = {cookie['name']: cookie['value'] for cookie in driver.get_cookies()}
+    html = driver.page_source
 
-        if details.get('public_meetup'):
-            try: js_click(driver, "//span[text()='Public meetup']", state, timeout=3)
-            except: pass
-        if details.get('door_pickup'):
-            try: js_click(driver, "//span[text()='Door pickup']", state, timeout=3)
-            except: pass
+    # Extract fb_dtsg
+    dtsg_match = re.search(r'name="fb_dtsg" value="(.*?)"', html)
+    if not dtsg_match:
+         dtsg_match = re.search(r'"DTSGInitialData",\[\],\{"token":"(.*?)"', html)
+    fb_dtsg = dtsg_match.group(1) if dtsg_match else None
 
-        time.sleep(2)
-        if not state.GLOBAL_STOP:
-            print(f"[{p_name}] Proceeding to Publish...")
+    # Extract LSD
+    lsd_match = re.search(r'"LSD",\[\],\{"token":"(.*?)"\}', html)
+    if not lsd_match:
+        lsd_match = re.search(r'name="lsd" value="(.*?)"', html)
+    lsd = lsd_match.group(1) if lsd_match else ""
 
-            # Auto delete old listings if configured
-            if details.get('auto_delete_old'):
-                print(f"[{p_name}] (Feature Placeholder) Scanning for duplicate listings to delete before publishing...")
-                time.sleep(2)
+    # Calculate jazoest
+    jazoest = '2' + str(sum(ord(c) for c in fb_dtsg)) if fb_dtsg else ""
 
-            try:
-                next_btn_xpath = "//div[@aria-label='Next'] | //span[text()='Next'] | //div[@role='button']//span[text()='Next']"
-                next_btn = wait_and_find(driver, next_btn_xpath, state, timeout=10)
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", next_btn)
-                time.sleep(1)
-                driver.execute_script("arguments[0].click();", next_btn)
-                time.sleep(4)
-            except Exception as e:
-                print(f"[{p_name}] Next button issue: {e}")
+    # Extract Profile ID
+    user_match = re.search(r'"USER_ID":"(\d+)"', html)
+    profile_id = user_match.group(1) if user_match else None
 
-            try:
-                publish_btn_xpath = "//div[@aria-label='Publish'] | //span[text()='Publish'] | //div[@role='button']//span[contains(text(), 'Publish')]"
-                publish_btn = wait_and_find(driver, publish_btn_xpath, state, timeout=10)
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", publish_btn)
-                time.sleep(1)
-                driver.execute_script("arguments[0].click();", publish_btn)
+    # Extract hidden GraphQL routing data via Javascript
+    fb_env = driver.execute_script("""
+        try {
+            const sd = require('SiteData');
+            return {
+                rev: sd.revision || '',
+                hsi: sd.hsi || '',
+                spin_r: sd.__spin_r || '',
+                spin_b: sd.__spin_b || '',
+                spin_t: sd.__spin_t || ''
+            };
+        } catch(e) {
+            return {};
+        }
+    """)
 
-                print(f"✅ [{p_name}] Listing POSTED and PUBLISHED successfully!")
-                time.sleep(10)
-            except Exception as e:
-                print(f"❌ [{p_name}] Failed to click Publish: {e}")
-                time.sleep(15)
+    return cookies, fb_dtsg, jazoest, lsd, profile_id, fb_env
+
+def _api_upload_image(session, image_path, fb_dtsg, jazoest, lsd, profile_id):
+    """Uploads a single image directly via API and returns its photo_id."""
+    url = f"https://upload.facebook.com/ajax/react_composer/attachments/photo/upload?av={profile_id}&__user={profile_id}&__a=1&fb_dtsg={fb_dtsg}&jazoest={jazoest}&lsd={lsd}"
+
+    data = {
+        "fb_dtsg": fb_dtsg,
+        "qn": "comet_marketplace_composer",
+        "target_id": "355209128917923",
+        "source": "8",
+        "profile_id": profile_id,
+        "waterfallxapp": "comet",
+        "upload_id": "1024" # Standard FB behavior
+    }
+
+    with open(image_path, 'rb') as f:
+        # Force image/jpeg MIME type
+        files = {'farr': (image_path.split('/')[-1].split('\\')[-1], f, 'image/jpeg')}
+        response = session.post(url, data=data, files=files)
+
+    try:
+        raw_text = response.text.replace('for (;;);', '').strip()
+        clean_res = json.loads(raw_text)
+        payload = clean_res.get('payload')
+
+        if payload and isinstance(payload, dict):
+            # FB might return 'fbid' or 'photoID'
+            photo_id = payload.get('fbid') or payload.get('photoID')
+            if photo_id:
+                return str(photo_id)
+
+        print(f"❌ FB rejected the image. Raw Response: {raw_text}")
+        return None
 
     except Exception as e:
-        if not state.GLOBAL_STOP:
-            print(f"❌ [{p_name}] Error during listing: {e}")
-            time.sleep(15)
+        print(f"❌ Failed to parse FB response: {e}")
+        return None
+
+def _api_publish_listing(driver, template_data, photo_ids, fb_dtsg, jazoest, lsd, profile_id):
+    """Injects a native JS fetch request into the browser with full Form Data sync."""
+
+    CATEGORY_MAP = {
+        "Tools": "1670493229902393",
+        "Furniture": "1583634935226685",
+        "Household": "1569171756675761",
+        "Garden": "800089866739547",
+        "Appliances": "678754142233400",
+        "Video Games": "686977074745292",
+        "Books, Movies & Music": "613858625416355",
+        "Bags & Luggage": "1567543000236608",
+        "Women's clothing & shoes": "1266429133383966",
+        "Men's clothing & shoes": "931157863635831",
+        "Jewelry & Accessories": "214968118845643",
+        "Health & beauty": "1555452698044988",
+        "Pet Supplies": "1550246318620997",
+        "Baby & kids": "624859874282116",
+        "Toys & Games": "606456512821491",
+        "Electronics & computers": "1792291877663080",
+        "Mobile phones": "1557869527812749",
+        "Bicycles": "1658310421102081",
+        "Arts & Crafts": "1534799543476160",
+        "Sports & Outdoors": "1383948661922113",
+        "Auto parts": "757715671026531",
+        "Musical Instruments": "676772489112490",
+        "Antiques & Collectibles": "393860164117441",
+        "Garage Sale": "1834536343472201",
+        "Miscellaneous": "895487550471874"
+    }
+
+    condition_map = {
+        "New": "new", "Used - Like New": "used_like_new",
+        "Used - Good": "used_good", "Used - Fair": "used_fair"
+    }
+    condition_val = condition_map.get(template_data.get('condition'), "used_good")
+    cat_id = CATEGORY_MAP.get(template_data.get('category'), "1569171756675761")
+
+    delivery_types = ["IN_PERSON"]
+    if template_data.get('door_meetup'):
+        delivery_types.append("DOOR_DROPOFF")
+
+    photo_ids = [str(pid) for pid in photo_ids]
+
+    variables = {
+        "input": {
+            "actor_id": str(profile_id),
+            "client_mutation_id": str(random.randint(1, 20)),
+            # Updated to match FB's new strict multi-component tracking format
+            "attribution_id_v2": f"CometMarketplaceComposerRoot.react,comet.marketplace.composer,unexpected,{int(time.time()*1000)},202263,1606854132932955,,;CometMarketplaceComposerCreateComponent.react,comet.marketplace.composer.create,unexpected,{int(time.time()*1000)},144350,1606854132932955,,;",
+            "audience": {"marketplace": {"marketplace_id": "1663689853903557"}},
+            "data": {
+                "common": {
+                    "attribute_data_json": json.dumps({"condition": condition_val}, separators=(',', ':')),
+                    "category_id": str(cat_id),
+                    "commerce_shipping_carrier": None,
+                    "commerce_shipping_carriers": [],
+                    "comparable_price": "null",
+                    "cost_per_additional_item": None,
+                    "delivery_types": delivery_types,
+                    "description": {"text": str(template_data.get('desc') or '')},
+                    "draft_type": "COMMERCE_SELL_OPTIONS",
+                    "hidden_from_friends_visibility": "VISIBLE_TO_EVERYONE",
+                    "is_personalization_required": None,
+                    "is_photo_order_set_by_seller": False,
+                    "is_preview": False,
+                    "item_price": {"currency": "USD", "price": str(template_data.get('price') or '0')},
+                    "latitude": 31.5204,
+                    "listing_email_id": None,
+                    "longitude": 74.3587,
+                    "min_acceptable_checkout_offer_price": "null",
+                    "personalization_info": None,
+                    "product_hashtag_names": [],
+                    "quantity": -1 if template_data.get('availability') == "List as Single Item" else 1,
+                    "shipping_calculation_logic_version": None,
+                    "shipping_cost_option": "BUYER_PAID_SHIPPING",
+                    "shipping_cost_range_lower_cost": None,
+                    "shipping_cost_range_upper_cost": None,
+                    "shipping_label_price": "0",
+                    "shipping_label_rate_code": None,
+                    "shipping_label_rate_type": None,
+                    "shipping_offered": False,
+                    "shipping_options_data": [],
+                    "shipping_package_weight": None,
+                    "shipping_price": "null",
+                    "shipping_service_type": None,
+                    "sku": "",
+                    "source_type": "marketplace_unknown",
+                    "suggested_hashtag_names": [],
+                    "surface": "composer",
+                    "title": str(template_data.get('title') or 'Listing'),
+                    "video_ids": [],
+                    "xpost_target_ids": [],
+                    "comments_disabled": True,
+                    "photo_ids": photo_ids
+                }
+            }
+        }
+    }
+
+    # Force exact form-data structure Facebook expects
+    data = {
+        "av": profile_id,
+        "__user": profile_id,
+        "__a": "1",
+        "__req": "2a",
+        "__aaid": "0",
+        "fb_dtsg": fb_dtsg,
+        "jazoest": jazoest,
+        "lsd": lsd,
+        "__comet_req": "15", # Added: Required for modern FB routing
+        "__crn": "comet.fbweb.CometMarketplaceComposerRoute",
+        "qpl_active_flow_ids": "138820675",
+        "fb_api_caller_class": "RelayModern",
+        "fb_api_req_friendly_name": "useCometMarketplaceListingCreateMutation",
+        "variables": json.dumps(variables, separators=(',', ':')),
+        "server_timestamps": "true",
+        "fb_api_analytics_tags": '["qpl_active_flow_ids=138820675"]',
+        "doc_id": "9551550371629242"
+    }
+
+    encoded_data = urllib.parse.urlencode(data)
+    driver.set_script_timeout(15)
+
+    # SMARTER JS: Uses string concatenation to avoid data corruption and passes LSD explicitly
+    js_code = """
+    var done = arguments[arguments.length - 1];
+    var base_payload = arguments[0];
+    var passed_lsd = arguments[1];
+
+    var sd = {};
+    try { sd = require('SiteData'); } catch(e) {}
+
+    // Append SiteData safely without using URLSearchParams which corrupts JSON strings
+    var body_str = base_payload;
+    if(sd.revision) body_str += '&__rev=' + sd.revision;
+    if(sd.hsi) body_str += '&__hsi=' + sd.hsi;
+    if(sd.__spin_r) body_str += '&__spin_r=' + sd.__spin_r;
+    if(sd.__spin_b) body_str += '&__spin_b=' + sd.__spin_b;
+    if(sd.__spin_t) body_str += '&__spin_t=' + sd.__spin_t;
+
+    fetch("https://www.facebook.com/api/graphql/", {
+        method: "POST",
+        credentials: "same-origin", // CRITICAL: Ensures session cookies are sent
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-FB-Friendly-Name": "useCometMarketplaceListingCreateMutation",
+            "X-FB-LSD": passed_lsd,
+            "X-ASBD-ID": "359341"
+        },
+        body: body_str
+    })
+    .then(response => response.json())
+    .then(data => done(data))
+    .catch(error => done({"errors": [{"message": "JS Fetch failed: " + error}]}));
+    """
+
+    # Pass LSD explicitly as the second argument
+    response_json = driver.execute_async_script(js_code, encoded_data, lsd)
+    return response_json
