@@ -93,9 +93,6 @@ class ControlPanel:
         scrollbar = Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = Frame(self.canvas, bg=state.BG_PANEL)
         self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.scrollable_frame.bind("<MouseWheel>", _on_mousewheel)
-        self.scrollable_frame.bind("<Button-4>", _on_mousewheel)
-        self.scrollable_frame.bind("<Button-5>", _on_mousewheel)
         self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.canvas.configure(yscrollcommand=scrollbar.set)
 
@@ -112,6 +109,9 @@ class ControlPanel:
         self.canvas.bind("<MouseWheel>", _on_mousewheel)
         self.canvas.bind("<Button-4>", _on_mousewheel)
         self.canvas.bind("<Button-5>", _on_mousewheel)
+        self.scrollable_frame.bind("<MouseWheel>", _on_mousewheel)
+        self.scrollable_frame.bind("<Button-4>", _on_mousewheel)
+        self.scrollable_frame.bind("<Button-5>", _on_mousewheel)
 
         self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
         scrollbar.pack(side=RIGHT, fill=Y)
@@ -246,6 +246,9 @@ class ControlPanel:
         self.msg_profiles_canvas.bind("<MouseWheel>", _on_mousewheel_msg_profiles)
         self.msg_profiles_canvas.bind("<Button-4>", _on_mousewheel_msg_profiles)
         self.msg_profiles_canvas.bind("<Button-5>", _on_mousewheel_msg_profiles)
+        self.msg_profiles_frame.bind("<MouseWheel>", _on_mousewheel_msg_profiles)
+        self.msg_profiles_frame.bind("<Button-4>", _on_mousewheel_msg_profiles)
+        self.msg_profiles_frame.bind("<Button-5>", _on_mousewheel_msg_profiles)
 
         self.msg_profiles_canvas.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
         self.msg_profiles_scrollbar.pack(side=RIGHT, fill=Y)
@@ -277,6 +280,9 @@ class ControlPanel:
         self.msg_canvas.bind("<MouseWheel>", _on_mousewheel_msg_chats)
         self.msg_canvas.bind("<Button-4>", _on_mousewheel_msg_chats)
         self.msg_canvas.bind("<Button-5>", _on_mousewheel_msg_chats)
+        self.msg_frame.bind("<MouseWheel>", _on_mousewheel_msg_chats)
+        self.msg_frame.bind("<Button-4>", _on_mousewheel_msg_chats)
+        self.msg_frame.bind("<Button-5>", _on_mousewheel_msg_chats)
 
         self.msg_canvas.pack(side=LEFT, fill=BOTH, expand=True, padx=10, pady=10)
         self.msg_scrollbar.pack(side=RIGHT, fill=Y)
@@ -694,20 +700,38 @@ class ControlPanel:
 
         notebook = ttk.Notebook(self.form)
         notebook.pack(fill=BOTH, expand=True, padx=15, pady=15)
+        def _on_mousewheel_tabs(event):
+            canvas_to_scroll = None
+            if str(event.widget).startswith(str(tab1_canvas)):
+                canvas_to_scroll = tab1_canvas
+            elif str(event.widget).startswith(str(tab2_canvas)):
+                canvas_to_scroll = tab2_canvas
+            elif str(event.widget).startswith(str(tab3_canvas)):
+                canvas_to_scroll = tab3_canvas
+
+            if canvas_to_scroll:
+                if hasattr(event, "delta") and event.delta:
+                    canvas_to_scroll.yview_scroll(int(-1*(event.delta/120)), "units")
+                elif hasattr(event, "num"):
+                    if event.num == 4:
+                        canvas_to_scroll.yview_scroll(-1, "units")
+                    elif event.num == 5:
+                        canvas_to_scroll.yview_scroll(1, "units")
+
         tab1_base = Frame(notebook, bg=state.BG_PANEL)
         notebook.add(tab1_base, text=" Basic Configuration ")
         tab1_canvas = Canvas(tab1_base, bg=state.BG_PANEL, highlightthickness=0)
         tab1_scrollbar = Scrollbar(tab1_base, orient="vertical", command=tab1_canvas.yview)
         tab1 = Frame(tab1_canvas, bg=state.BG_PANEL)
         tab1.bind("<Configure>", lambda e: tab1_canvas.configure(scrollregion=tab1_canvas.bbox("all")))
-        tab1.bind("<MouseWheel>", _on_mousewheel)
-        tab1.bind("<Button-4>", _on_mousewheel)
-        tab1.bind("<Button-5>", _on_mousewheel)
         tab1_canvas.create_window((0, 0), window=tab1, anchor="nw")
         tab1_canvas.configure(yscrollcommand=tab1_scrollbar.set)
-        tab1_canvas.bind("<MouseWheel>", _on_mousewheel)
-        tab1_canvas.bind("<Button-4>", _on_mousewheel)
-        tab1_canvas.bind("<Button-5>", _on_mousewheel)
+        tab1_canvas.bind("<MouseWheel>", _on_mousewheel_tabs)
+        tab1_canvas.bind("<Button-4>", _on_mousewheel_tabs)
+        tab1_canvas.bind("<Button-5>", _on_mousewheel_tabs)
+        tab1.bind("<MouseWheel>", _on_mousewheel_tabs)
+        tab1.bind("<Button-4>", _on_mousewheel_tabs)
+        tab1.bind("<Button-5>", _on_mousewheel_tabs)
         tab1_canvas.pack(side=LEFT, fill=BOTH, expand=True)
         tab1_scrollbar.pack(side=RIGHT, fill=Y)
 
@@ -717,14 +741,14 @@ class ControlPanel:
         tab2_scrollbar = Scrollbar(tab2_base, orient="vertical", command=tab2_canvas.yview)
         tab2 = Frame(tab2_canvas, bg=state.BG_PANEL)
         tab2.bind("<Configure>", lambda e: tab2_canvas.configure(scrollregion=tab2_canvas.bbox("all")))
-        tab2.bind("<MouseWheel>", _on_mousewheel)
-        tab2.bind("<Button-4>", _on_mousewheel)
-        tab2.bind("<Button-5>", _on_mousewheel)
         tab2_canvas.create_window((0, 0), window=tab2, anchor="nw")
         tab2_canvas.configure(yscrollcommand=tab2_scrollbar.set)
-        tab2_canvas.bind("<MouseWheel>", _on_mousewheel)
-        tab2_canvas.bind("<Button-4>", _on_mousewheel)
-        tab2_canvas.bind("<Button-5>", _on_mousewheel)
+        tab2_canvas.bind("<MouseWheel>", _on_mousewheel_tabs)
+        tab2_canvas.bind("<Button-4>", _on_mousewheel_tabs)
+        tab2_canvas.bind("<Button-5>", _on_mousewheel_tabs)
+        tab2.bind("<MouseWheel>", _on_mousewheel_tabs)
+        tab2.bind("<Button-4>", _on_mousewheel_tabs)
+        tab2.bind("<Button-5>", _on_mousewheel_tabs)
         tab2_canvas.pack(side=LEFT, fill=BOTH, expand=True)
         tab2_scrollbar.pack(side=RIGHT, fill=Y)
 
@@ -734,14 +758,14 @@ class ControlPanel:
         tab3_scrollbar = Scrollbar(tab3_base, orient="vertical", command=tab3_canvas.yview)
         tab3 = Frame(tab3_canvas, bg=state.BG_PANEL)
         tab3.bind("<Configure>", lambda e: tab3_canvas.configure(scrollregion=tab3_canvas.bbox("all")))
-        tab3.bind("<MouseWheel>", _on_mousewheel)
-        tab3.bind("<Button-4>", _on_mousewheel)
-        tab3.bind("<Button-5>", _on_mousewheel)
         tab3_canvas.create_window((0, 0), window=tab3, anchor="nw")
         tab3_canvas.configure(yscrollcommand=tab3_scrollbar.set)
-        tab3_canvas.bind("<MouseWheel>", _on_mousewheel)
-        tab3_canvas.bind("<Button-4>", _on_mousewheel)
-        tab3_canvas.bind("<Button-5>", _on_mousewheel)
+        tab3_canvas.bind("<MouseWheel>", _on_mousewheel_tabs)
+        tab3_canvas.bind("<Button-4>", _on_mousewheel_tabs)
+        tab3_canvas.bind("<Button-5>", _on_mousewheel_tabs)
+        tab3.bind("<MouseWheel>", _on_mousewheel_tabs)
+        tab3.bind("<Button-4>", _on_mousewheel_tabs)
+        tab3.bind("<Button-5>", _on_mousewheel_tabs)
         tab3_canvas.pack(side=LEFT, fill=BOTH, expand=True)
         tab3_scrollbar.pack(side=RIGHT, fill=Y)
 
@@ -773,9 +797,6 @@ class ControlPanel:
         self.thumbs_frame = Frame(self.thumbs_canvas, bg="#F1F5F9")
 
         self.thumbs_frame.bind("<Configure>", lambda e: self.thumbs_canvas.configure(scrollregion=self.thumbs_canvas.bbox("all")))
-        self.thumbs_frame.bind("<MouseWheel>", _on_mousewheel_thumbs)
-        self.thumbs_frame.bind("<Button-4>", _on_mousewheel_thumbs)
-        self.thumbs_frame.bind("<Button-5>", _on_mousewheel_thumbs)
         self.thumbs_canvas.create_window((0, 0), window=self.thumbs_frame, anchor="nw")
         self.thumbs_canvas.configure(yscrollcommand=self.thumbs_scrollbar.set)
 
@@ -791,6 +812,9 @@ class ControlPanel:
         self.thumbs_canvas.bind("<MouseWheel>", _on_mousewheel_thumbs)
         self.thumbs_canvas.bind("<Button-4>", _on_mousewheel_thumbs)
         self.thumbs_canvas.bind("<Button-5>", _on_mousewheel_thumbs)
+        self.thumbs_frame.bind("<MouseWheel>", _on_mousewheel_thumbs)
+        self.thumbs_frame.bind("<Button-4>", _on_mousewheel_thumbs)
+        self.thumbs_frame.bind("<Button-5>", _on_mousewheel_thumbs)
 
         self.thumbs_canvas.pack(side=LEFT, fill=BOTH, expand=True)
         self.thumbs_scrollbar.pack(side=RIGHT, fill=Y)
