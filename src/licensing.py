@@ -104,10 +104,7 @@ def show_activation_screen(error_msg="Software Locked"):
     # Action Area
     def buy_now():
         try:
-            # In real scenario, fetch config to get dynamic number
-            # config = requests.get(CONFIG_URL).json()
-            # num = config["whatsapp"]
-            num = "1234567890" # fallback
+            num = "923490098654"
             webbrowser.open(f"https://wa.me/{num}?text=I want to buy a license for Abiz Global Enterprise. My Hardware ID is {hwid}")
         except:
             pass
