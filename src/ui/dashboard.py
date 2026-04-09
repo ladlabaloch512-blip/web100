@@ -1,9 +1,12 @@
+from src.browser.launcher import launch_browser
+from src.automation.selenium_utils import wait_for_page_load
+import time
 import os
 import sys
 import json
 import subprocess
 import threading
-from tkinter import Tk, filedialog, Label, Entry, StringVar, ttk, Toplevel, simpledialog, Canvas, Frame, Scrollbar, Checkbutton, BooleanVar, Radiobutton, LEFT, RIGHT, Y, BOTH, X, BOTTOM, TOP
+from tkinter import Tk, filedialog, Label, Entry, StringVar, ttk, Toplevel, simpledialog, messagebox, Canvas, Frame, Scrollbar, Checkbutton, BooleanVar, Radiobutton, Text, LEFT, RIGHT, Y, BOTH, X, BOTTOM, TOP
 from PIL import Image, ImageTk
 
 import src.state as state
@@ -57,6 +60,7 @@ class ControlPanel:
         HoverButton(mgt_frame, text="➕ Create Profiles & Shortcuts", hover_color="#475569", command=self.bulk_create, bg="#64748B", fg="white", font=("Segoe UI", 10), relief="flat", cursor="hand2").pack(fill=X, padx=20, pady=5)
         HoverButton(mgt_frame, text="🧹 Clean Cache & Temp Data", hover_color="#6B7280", command=self.bulk_clear_cache, bg="#9CA3AF", fg="white", font=("Segoe UI", 10), relief="flat", cursor="hand2").pack(fill=X, padx=20, pady=5)
         HoverButton(mgt_frame, text="🗑️ Delete Profiles (Immediate)", hover_color=state.BTN_RED_HOVER, command=self.bulk_delete_immediate, bg=state.BTN_RED, fg="white", font=("Segoe UI", 10, "bold"), relief="flat", height=2, cursor="hand2").pack(fill=X, padx=20, pady=5)
+        HoverButton(mgt_frame, text="🩺 Check Health (Logins)", hover_color=state.BTN_GREEN_HOVER, command=self.bulk_health_check, bg=state.BTN_GREEN, fg="white", font=("Segoe UI", 10, "bold"), relief="flat", height=2, cursor="hand2").pack(fill=X, padx=20, pady=(0,5))
 
         HoverButton(mgt_frame, text="📦 Export Profiles", hover_color="#10B981", command=self.export_profiles, bg="#059669", fg="white", font=("Segoe UI", 10), relief="flat", cursor="hand2").pack(fill=X, padx=20, pady=5)
         HoverButton(mgt_frame, text="📥 Import Profiles", hover_color="#3B82F6", command=self.import_profiles, bg="#2563EB", fg="white", font=("Segoe UI", 10), relief="flat", cursor="hand2").pack(fill=X, padx=20, pady=5)
@@ -499,7 +503,7 @@ class ControlPanel:
         show_alert(self.root, "Cleaned", f"Cache cleared for {p_name}.", "success")
 
     def single_delete(self, p_name):
-        if simpledialog.messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete {p_name} permanently?"):
+        if messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete {p_name} permanently?"):
             force_delete_dir(os.path.join(state.BASE_PATH, p_name))
             self.refresh_profiles()
             play_success_sound()
@@ -679,6 +683,54 @@ class ControlPanel:
         HoverButton(btn_frame, text="Yes, Terminate", command=execute_delete, bg=state.BTN_RED, hover_color=state.BTN_RED_HOVER, fg="white", font=("Segoe UI", 10, "bold"), relief="flat", cursor="hand2").pack(side=LEFT, padx=10)
         HoverButton(btn_frame, text="Cancel", command=alert_box.destroy, bg="#E2E8F0", hover_color="#CBD5E1", fg=state.FG_TEXT, font=("Segoe UI", 10, "bold"), relief="flat", cursor="hand2").pack(side=LEFT, padx=10)
 
+
+
+    def bulk_health_check(self):
+        selected = self.get_selected_profiles()
+        if not selected:
+            return
+
+        self.progress.config(value=0)
+        total = len(selected)
+        offline_profiles = []
+
+        show_alert(self.root, "Health Check Started", f"Will verify {total} profiles. Browsers will open and close. Please wait...", "info")
+
+        for i, p_name in enumerate(selected):
+            try:
+                # Basic check first
+                if not check_login_status(p_name, state.BASE_PATH):
+                    offline_profiles.append(p_name)
+                else:
+                    # Actually open the browser and verify by looking at the page
+                    driver = launch_browser(p_name)
+                    driver.get("https://web.facebook.com")
+                    wait_for_page_load(driver)
+                    time.sleep(3)
+
+                    current_url = driver.current_url.lower()
+                    if "login" in current_url or "checkpoint" in current_url:
+                        offline_profiles.append(p_name)
+                    force_kill_browser(driver)
+            except Exception as e:
+                print(f"[Health Check Error] {p_name}: {e}")
+                offline_profiles.append(p_name)
+
+            self.progress.config(value=((i+1)/total)*100)
+            self.root.update_idletasks()
+
+        self.refresh_profiles()
+        self.progress.config(value=0)
+
+        if offline_profiles:
+            msg = f"Found {len(offline_profiles)} offline/suspended profile(s):\n" + "\n".join(offline_profiles[:5])
+            if len(offline_profiles) > 5:
+                msg += "\n...and more."
+            show_alert(self.root, "Health Check Completed", msg, "error")
+        else:
+            play_success_sound()
+            show_alert(self.root, "Health Check Completed", "All selected profiles are fully logged in and healthy!", "success")
+
     def bulk_clear_cache(self):
         selected = self.get_selected_profiles()
         if not selected:
@@ -724,7 +776,8 @@ class ControlPanel:
         tab1_scrollbar = Scrollbar(tab1_base, orient="vertical", command=tab1_canvas.yview)
         tab1 = Frame(tab1_canvas, bg=state.BG_PANEL)
         tab1.bind("<Configure>", lambda e: tab1_canvas.configure(scrollregion=tab1_canvas.bbox("all")))
-        tab1_canvas.create_window((0, 0), window=tab1, anchor="nw")
+        tab1_window = tab1_canvas.create_window((0, 0), window=tab1, anchor="nw")
+        tab1_canvas.bind("<Configure>", lambda e: tab1_canvas.itemconfig(tab1_window, width=e.width))
         tab1_canvas.configure(yscrollcommand=tab1_scrollbar.set)
         tab1_canvas.bind("<MouseWheel>", _on_mousewheel_tabs)
         tab1_canvas.bind("<Button-4>", _on_mousewheel_tabs)
@@ -741,7 +794,8 @@ class ControlPanel:
         tab2_scrollbar = Scrollbar(tab2_base, orient="vertical", command=tab2_canvas.yview)
         tab2 = Frame(tab2_canvas, bg=state.BG_PANEL)
         tab2.bind("<Configure>", lambda e: tab2_canvas.configure(scrollregion=tab2_canvas.bbox("all")))
-        tab2_canvas.create_window((0, 0), window=tab2, anchor="nw")
+        tab2_window = tab2_canvas.create_window((0, 0), window=tab2, anchor="nw")
+        tab2_canvas.bind("<Configure>", lambda e: tab2_canvas.itemconfig(tab2_window, width=e.width))
         tab2_canvas.configure(yscrollcommand=tab2_scrollbar.set)
         tab2_canvas.bind("<MouseWheel>", _on_mousewheel_tabs)
         tab2_canvas.bind("<Button-4>", _on_mousewheel_tabs)
@@ -758,7 +812,8 @@ class ControlPanel:
         tab3_scrollbar = Scrollbar(tab3_base, orient="vertical", command=tab3_canvas.yview)
         tab3 = Frame(tab3_canvas, bg=state.BG_PANEL)
         tab3.bind("<Configure>", lambda e: tab3_canvas.configure(scrollregion=tab3_canvas.bbox("all")))
-        tab3_canvas.create_window((0, 0), window=tab3, anchor="nw")
+        tab3_window = tab3_canvas.create_window((0, 0), window=tab3, anchor="nw")
+        tab3_canvas.bind("<Configure>", lambda e: tab3_canvas.itemconfig(tab3_window, width=e.width))
         tab3_canvas.configure(yscrollcommand=tab3_scrollbar.set)
         tab3_canvas.bind("<MouseWheel>", _on_mousewheel_tabs)
         tab3_canvas.bind("<Button-4>", _on_mousewheel_tabs)
