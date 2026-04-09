@@ -16,13 +16,28 @@ def get_chrome_major_version():
     except:
         return None
 
-def force_kill_browser(driver):
+def force_kill_browser(driver, profile_name=None):
     try:
-        pid = driver.browser_pid
-        driver.quit()
-        subprocess.run(f"taskkill /F /PID {pid} /T", shell=True, capture_output=True)
+        pid = getattr(driver, "browser_pid", None)
+        try:
+            driver.quit()
+        except:
+            pass
+        if pid:
+            subprocess.run(f"taskkill /F /PID {pid} /T", shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
     except:
         pass
+
+    if profile_name and sys.platform == "win32":
+        try:
+            # Aggressively kill any lingering chrome or chromedriver processes that are tied to this profile's command line arguments
+            wmic_cmd = f'wmic process where "name=\'chrome.exe\' and commandline like \'%{profile_name}%\'" call terminate'
+            subprocess.run(wmic_cmd, shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+
+            wmic_driver_cmd = f'wmic process where "name=\'chromedriver.exe\' and commandline like \'%{profile_name}%\'" call terminate'
+            subprocess.run(wmic_driver_cmd, shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        except:
+            pass
 
 def force_delete_dir(dir_path):
     try:

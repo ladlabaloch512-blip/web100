@@ -29,7 +29,7 @@ def worker_task(p_name, task_type, details=None, email=None, pwd=None, progress_
         if driver:
             if task_type == "login" and check_login_status(p_name, state.BASE_PATH):
                 time.sleep(10)
-            force_kill_browser(driver)
+            force_kill_browser(driver, profile_name=p_name)
             if driver in state.ACTIVE_DRIVERS:
                 state.ACTIVE_DRIVERS.remove(driver)
 

@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import subprocess
 import threading
@@ -84,6 +85,7 @@ class ControlPanel:
         Label(stf, text="📋 PROFILE DIRECTORY (SCANNER)", font=("Segoe UI", 13, "bold"), fg=state.FG_TEXT, bg=state.BG_PANEL).pack(side=LEFT)
         HoverButton(stf, text="🔄 Refresh", hover_color="#CBD5E1", command=self.refresh_profiles, bg="#E2E8F0", fg=state.FG_TEXT, font=("Segoe UI", 9, "bold"), relief="flat", padx=10, cursor="hand2").pack(side=RIGHT, padx=(5,0))
         HoverButton(stf, text="Select All", hover_color="#CBD5E1", command=self.select_all, bg="#E2E8F0", fg=state.FG_TEXT, font=("Segoe UI", 9, "bold"), relief="flat", padx=10, cursor="hand2").pack(side=RIGHT)
+        HoverButton(stf, text="Deselect All", hover_color="#FEE2E2", command=self.deselect_all, bg="#FEF2F2", fg=state.BTN_RED, font=("Segoe UI", 9, "bold"), relief="flat", padx=10, cursor="hand2").pack(side=RIGHT, padx=5)
 
         canvas_frame = Frame(scanner_frame, bg=state.BG_PANEL)
         canvas_frame.pack(fill=BOTH, expand=True, padx=15, pady=(0, 15))
@@ -397,6 +399,16 @@ class ControlPanel:
         for driver in state.ACTIVE_DRIVERS:
             force_kill_browser(driver)
         state.ACTIVE_DRIVERS.clear()
+
+        # Additional aggressive global sweep for safety
+        if sys.platform == "win32":
+            try:
+                import subprocess
+                subprocess.run('taskkill /F /IM chrome.exe /T', shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                subprocess.run('taskkill /F /IM chromedriver.exe /T', shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            except:
+                pass
+
         show_alert(self.root, "Stopped", "Automation halted forcefully. Ghost processes killed.", "error")
 
     def refresh_profiles(self):
@@ -440,6 +452,10 @@ class ControlPanel:
     def select_all(self):
         for var in self.profile_vars.values():
             var.set(True)
+
+    def deselect_all(self):
+        for var in self.profile_vars.values():
+            var.set(False)
 
     def get_selected_profiles(self):
         selected = [p for p, var in self.profile_vars.items() if var.get()]
@@ -521,11 +537,19 @@ class ControlPanel:
             return
 
         elif task_type == "login_auto":
-            ids_input = simpledialog.askstring("Credentials", f"Enter credentials for {p_name}\n(Format: email,password):", parent=self.root)
-            if not ids_input or "," not in ids_input:
+            filepath = filedialog.askopenfilename(title=f"Select Credentials Text File for {p_name}", filetypes=[("Text Files", "*.txt")], parent=self.root)
+            if not filepath:
                 return
-            ids = ids_input.split(",")
-            threading.Thread(target=worker_task, args=(p_name, "login", None, ids[0], ids[1]), daemon=True).start()
+            try:
+                with open(filepath, "r") as f:
+                    for line in f:
+                        if "," in line:
+                            ids = line.strip().split(",")
+                            threading.Thread(target=worker_task, args=(p_name, "login", None, ids[0], ids[1]), daemon=True).start()
+                            return
+                show_alert(self.root, "Invalid Format", "No valid 'email,password' format found in the text file.", "error")
+            except Exception as e:
+                show_alert(self.root, "Error", f"Could not read file: {e}", "error")
             return
         elif task_type == "messenger":
             threading.Thread(target=worker_task, args=(p_name, "messenger", None, None, None), daemon=True).start()
