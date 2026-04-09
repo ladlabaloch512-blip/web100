@@ -4,6 +4,7 @@ from src.utils.system_utils import check_login_status, force_kill_browser, smart
 from src.browser.launcher import launch_browser
 from src.automation.facebook_core import perform_login, perform_listing, perform_manual
 from src.automation.messenger import monitor_messenger, send_messenger_reply
+from src.automation.bulk_publisher import publish_drafts
 
 def worker_task(p_name, task_type, details=None, email=None, pwd=None, progress_callback=None):
     if state.GLOBAL_STOP:
@@ -16,6 +17,9 @@ def worker_task(p_name, task_type, details=None, email=None, pwd=None, progress_
             perform_login(driver, email, pwd, p_name, state)
         elif task_type == "listing":
             perform_listing(driver, details, p_name, state)
+        elif task_type == "publish_drafts":
+            tabs_count = details.get("tabs_count", 3)
+            publish_drafts(driver, p_name, tabs_count)
         elif task_type == "messenger":
             monitor_messenger(driver, p_name, state)
         elif task_type == "messenger_reply":

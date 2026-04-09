@@ -69,6 +69,8 @@ def perform_login(driver, email, password, p_name, state):
             print(f"❌ [{p_name}] Failed to load Facebook login page.")
             return False
 
+import src.state.database as db
+
 def perform_listing(driver, details, p_name, state):
     print(f"🛒 [{p_name}] Starting API listing process...")
     try:
@@ -76,11 +78,6 @@ def perform_listing(driver, details, p_name, state):
         driver.get("https://www.facebook.com/marketplace/create/item")
         wait_for_page_load(driver, state)
         time.sleep(5) # Wait for DOM and cookies to load
-
-        # Random delay as requested (3-5 seconds)
-        delay = random.uniform(3, 5)
-        print(f"⏳ [{p_name}] Applying random delay of {delay:.2f} seconds...")
-        time.sleep(delay)
 
         # 2. Extract active session data (Session Hijacking)
         print(f"🕵️ [{p_name}] Extracting Security Tokens & Routing Data...")
@@ -102,44 +99,80 @@ def perform_listing(driver, details, p_name, state):
             "X-ASBD-ID": "359341"
         })
 
-        # 3. Upload Images via API
-        photo_ids = []
-        for img_path in details.get('images', []):
+        titles_list = []
+        if details.get("title_type") == "file":
+            try:
+                with open(details["title_file"], "r") as f:
+                    titles_list = [t.strip() for t in f.readlines() if t.strip()]
+            except Exception:
+                titles_list = [details.get("title", "Listing")]
+        else:
+            titles_list = [details.get("title", "Listing")]
+
+        drafts_multiplier = details.get("drafts_multiplier", 1)
+        original_images = details.get('images', [])
+
+        for i in range(drafts_multiplier):
             if state.GLOBAL_STOP:
                 return False
-            print(f"📸 [{p_name}] Uploading image via API: {img_path}")
-            fbid = _api_upload_image(session, img_path, fb_dtsg, jazoest, lsd, profile_id)
-            if fbid:
-                photo_ids.append(fbid)
-            time.sleep(1)
 
-        if not photo_ids:
-            print(f"⚠️ [{p_name}] No images were uploaded successfully. Aborting.")
-            return False
+            print(f"\n--- [{p_name}] Processing Draft {i+1} of {drafts_multiplier} ---")
 
-        if state.GLOBAL_STOP:
-            return False
+            # Random delay as requested (3-5 seconds)
+            delay = random.uniform(3, 5)
+            print(f"⏳ [{p_name}] Applying random delay of {delay:.2f} seconds...")
+            time.sleep(delay)
 
-        # 4. Save Listing as Draft via JS Fetch Injection
-        print(f"🚀 [{p_name}] Saving listing as Draft via Browser XHR Injection...")
+            # Pick a random title
+            current_title = random.choice(titles_list)
 
-        # Pass the driver instead of session
-        res_json = _api_publish_listing(driver, details, photo_ids, fb_dtsg, jazoest, lsd, profile_id)
+            # Shuffle images
+            current_images = original_images.copy()
+            random.shuffle(current_images)
 
-        # Check the JSON directly
-        if "errors" in res_json:
-            print(f"❌ [{p_name}] GraphQL Rejected the Request! FB says:")
-            print(json.dumps(res_json["errors"], indent=2))
-            return False
+            # 3. Upload Images via API
+            photo_ids = []
+            for img_path in current_images:
+                if state.GLOBAL_STOP:
+                    return False
+                print(f"📸 [{p_name}] Uploading image via API: {img_path}")
+                fbid = _api_upload_image(session, img_path, fb_dtsg, jazoest, lsd, profile_id)
+                if fbid:
+                    photo_ids.append(fbid)
+                time.sleep(1)
 
-        elif "data" in res_json:
-            print(f"✅ [{p_name}] Automation finished! FB confirmed Draft saved.")
-            return True
+            if not photo_ids:
+                print(f"⚠️ [{p_name}] No images were uploaded successfully for draft {i+1}. Skipping.")
+                continue
 
-        else:
-            print(f"⚠️ [{p_name}] Unknown response format.")
-            print(res_json)
-            return False
+            if state.GLOBAL_STOP:
+                return False
+
+            # Update the details copy with the current title
+            current_details = details.copy()
+            current_details["title"] = current_title
+
+            # 4. Save Listing as Draft via JS Fetch Injection
+            print(f"🚀 [{p_name}] Saving listing '{current_title}' as Draft via Browser XHR Injection...")
+            res_json = _api_publish_listing(driver, current_details, photo_ids, fb_dtsg, jazoest, lsd, profile_id)
+
+            if "errors" in res_json:
+                print(f"❌ [{p_name}] GraphQL Rejected the Request! FB says:")
+                print(json.dumps(res_json["errors"], indent=2))
+            elif "data" in res_json:
+                try:
+                    # Extract the newly created listing ID
+                    listing_id = res_json["data"]["marketplace_listing_create"]["marketplace_listing_fbid"]
+                    url = f"https://www.facebook.com/marketplace/item/{listing_id}/"
+                    print(f"✅ [{p_name}] Draft saved! ID: {listing_id}")
+                    db.insert_draft(p_name, listing_id, url, current_title, "Drafted")
+                except Exception as ex:
+                    print(f"✅ [{p_name}] Draft saved, but could not parse Listing ID. Raw data: {res_json}")
+            else:
+                print(f"⚠️ [{p_name}] Unknown response format.")
+                print(res_json)
+
+        return True
     except Exception as e:
         print(f"⚠️ [{p_name}] Error during API listing: {e}")
         return False
@@ -381,7 +414,11 @@ def _api_publish_listing(driver, template_data, photo_ids, fb_dtsg, jazoest, lsd
         },
         body: body_str
     })
-    .then(response => response.json())
+    .then(response => response.text())
+    .then(text => {
+        var cleanText = text.replace('for (;;);', '').trim();
+        return JSON.parse(cleanText);
+    })
     .then(data => done(data))
     .catch(error => done({"errors": [{"message": "JS Fetch failed: " + error}]}));
     """

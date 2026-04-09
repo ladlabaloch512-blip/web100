@@ -23,6 +23,19 @@ class ControlPanel:
         self.root.configure(bg=state.BG_APP)
         self.profile_vars = {}
 
+        # Check and Prompt for Master Profile Directory
+        if not state.BASE_PATH or not os.path.exists(state.BASE_PATH):
+            messagebox.showinfo("First Run Setup", "Please select a Master Folder where all browser profiles will be stored.")
+            folder = filedialog.askdirectory(title="Select Master Profiles Folder")
+            if folder:
+                state.BASE_PATH = folder
+                state.app_config["profiles_dir"] = folder
+                state.save_config(state.app_config)
+            else:
+                messagebox.showerror("Error", "A master profiles folder is required to run the app.")
+                self.root.destroy()
+                return
+
         style = ttk.Style()
         style.theme_use('clam')
         style.configure("TButton", font=("Segoe UI", 10), padding=6, relief="flat", background=state.BG_PANEL)
@@ -50,6 +63,8 @@ class ControlPanel:
         HoverButton(bulk_auto_frame, text="🔑 Queued Multi-Login", hover_color=state.BTN_BLUE_HOVER, command=self.prepare_login_queued, bg=state.BTN_BLUE, fg="white", font=("Segoe UI", 10, "bold"), relief="flat", height=2, cursor="hand2").pack(fill=X, padx=20, pady=6)
         HoverButton(bulk_auto_frame, text="🛍️ Queued Multi-Listing", hover_color=state.BTN_ORANGE_HOVER, command=self.open_multi_listing_form, bg=state.BTN_ORANGE, fg="white", font=("Segoe UI", 10, "bold"), relief="flat", height=2, cursor="hand2").pack(fill=X, padx=20, pady=6)
         HoverButton(bulk_auto_frame, text="💬 Queued Messenger Inbox", hover_color=state.BTN_PURPLE_HOVER, command=self.prepare_messenger_queued, bg=state.BTN_PURPLE, fg="white", font=("Segoe UI", 10, "bold"), relief="flat", height=2, cursor="hand2").pack(fill=X, padx=20, pady=6)
+
+        HoverButton(bulk_auto_frame, text="📢 Publish Pending Drafts", hover_color="#14b8a6", command=self.prepare_publish_drafts_queued, bg="#0d9488", fg="white", font=("Segoe UI", 10, "bold"), relief="flat", height=2, cursor="hand2").pack(fill=X, padx=20, pady=6)
 
         HoverButton(bulk_auto_frame, text="📬 LIVE MESSAGES HUB", hover_color="#4F46E5", command=self.open_messenger_hub, bg="#4338CA", fg="white", font=("Segoe UI", 10, "bold"), relief="flat", height=2, cursor="hand2").pack(fill=X, padx=20, pady=(6,0))
         Label(bulk_auto_frame, text="", bg=state.BG_PANEL).pack()
@@ -144,6 +159,17 @@ class ControlPanel:
         HoverButton(qbf, text="🗑️ Clear Queue", hover_color="#475569", command=self.clear_queue_list, bg="#64748B", fg="white", font=("Segoe UI", 10), relief="flat", width=15).pack(side=LEFT, padx=(0,5))
         HoverButton(qbf, text="🛑 STOP ALL", hover_color=state.BTN_RED_HOVER, command=self.emergency_stop, bg=state.BTN_RED, fg="white", font=("Segoe UI", 10, "bold"), relief="flat", width=15).pack(side=LEFT, padx=5)
         HoverButton(qbf, text="🚀 RUN MASTER QUEUE", hover_color=state.BTN_GREEN_HOVER, command=self.run_master_queue_automated, bg=state.BTN_GREEN, fg="white", font=("Segoe UI", 10, "bold"), relief="flat").pack(side=RIGHT, fill=X, expand=True, padx=(5,0))
+
+        # Schedule Frame
+        schedule_frame = Frame(queue_frame, bg=state.BG_PANEL)
+        schedule_frame.pack(fill=X, padx=15, pady=(0, 10))
+
+        self.schedule_var = BooleanVar()
+        Checkbutton(schedule_frame, text="Schedule execution at:", variable=self.schedule_var, bg=state.BG_PANEL, font=("Segoe UI", 9)).pack(side=LEFT)
+
+        self.schedule_time_ent = Entry(schedule_frame, width=15, font=("Segoe UI", 9))
+        self.schedule_time_ent.insert(0, "YYYY-MM-DD HH:MM")
+        self.schedule_time_ent.pack(side=LEFT, padx=5)
 
         bottom_frame = Frame(self.root, bg=state.BG_APP)
         bottom_frame.pack(fill=X, side=BOTTOM, pady=10)
@@ -449,8 +475,19 @@ class ControlPanel:
             Label(row, text=p, font=("Segoe UI", 10), fg=state.FG_TEXT, bg=state.BG_PANEL, anchor="w", width=18).pack(side=LEFT, padx=5)
 
             logged_in = check_login_status(p, state.BASE_PATH)
-            status_text = "🟢  Ready" if logged_in else "⚪  Offline"
-            color = state.BTN_GREEN if logged_in else "#9CA3AF"
+
+            cached_status = state.app_config.get(f"status_{p}", None)
+
+            if cached_status == "2FA":
+                status_text = "⚠️ 2FA"
+                color = state.BTN_ORANGE
+            elif cached_status == "Offline" or not logged_in:
+                status_text = "⚪ Offline"
+                color = "#9CA3AF"
+            else:
+                status_text = "🟢 Ready"
+                color = state.BTN_GREEN
+
             Label(row, text=status_text, font=("Segoe UI", 9, "bold"), fg=color, bg=state.BG_PANEL, anchor="w", width=13).pack(side=LEFT, padx=5)
 
             btn_frame = Frame(row, bg=state.BG_PANEL)
@@ -609,6 +646,17 @@ class ControlPanel:
             return
         self.add_automated_to_queue(selected, "messenger")
 
+    def prepare_publish_drafts_queued(self):
+        selected = self.get_selected_profiles()
+        if not selected:
+            return
+
+        tabs = simpledialog.askinteger("Publish Drafts", "How many concurrent tabs should be opened per profile?", minvalue=1, maxvalue=20, parent=self.root)
+        if not tabs:
+            return
+
+        self.add_automated_to_queue(selected, "publish_drafts", {"tabs_count": tabs})
+
     def run_master_queue_automated(self):
         if not state.TASK_QUEUE:
             show_alert(self.root, "Queue Empty", "Add tasks to the queue first before running.", "error")
@@ -617,7 +665,27 @@ class ControlPanel:
         threads = self.ask_thread_count(len(state.TASK_QUEUE))
         if not threads:
             return
-        threading.Thread(target=execute_queue_automated, args=(threads, self.root, self.progress, self.update_queue_display), daemon=True).start()
+
+        if self.schedule_var.get():
+            try:
+                from datetime import datetime
+                target_time = datetime.strptime(self.schedule_time_ent.get(), "%Y-%m-%d %H:%M")
+
+                def schedule_waiter():
+                    while datetime.now() < target_time:
+                        if state.GLOBAL_STOP:
+                            return
+                        time.sleep(1)
+
+                    print(f"\n[SCHEDULE] Target time reached. Executing queue...")
+                    execute_queue_automated(threads, self.root, self.progress, self.update_queue_display)
+
+                threading.Thread(target=schedule_waiter, daemon=True).start()
+                show_alert(self.root, "Scheduled", f"Queue execution scheduled for {target_time.strftime('%Y-%m-%d %H:%M')}", "info")
+            except ValueError:
+                show_alert(self.root, "Invalid Time", "Please use the format YYYY-MM-DD HH:MM", "error")
+        else:
+            threading.Thread(target=execute_queue_automated, args=(threads, self.root, self.progress, self.update_queue_display), daemon=True).start()
 
     def bulk_create(self):
         count = simpledialog.askinteger("Create Profiles", "How many new profiles to provision?", minvalue=1, parent=self.root)
@@ -693,6 +761,7 @@ class ControlPanel:
         self.progress.config(value=0)
         total = len(selected)
         offline_profiles = []
+        checkpoint_profiles = []
 
         show_alert(self.root, "Health Check Started", f"Will verify {total} profiles. Browsers will open and close. Please wait...", "info")
 
@@ -701,6 +770,7 @@ class ControlPanel:
                 # Basic check first
                 if not check_login_status(p_name, state.BASE_PATH):
                     offline_profiles.append(p_name)
+                    state.app_config[f"status_{p_name}"] = "Offline"
                 else:
                     # Actually open the browser and verify by looking at the page
                     driver = launch_browser(p_name, state.BASE_PATH, state)
@@ -709,27 +779,33 @@ class ControlPanel:
                     time.sleep(3)
 
                     current_url = driver.current_url.lower()
-                    if "login" in current_url or "checkpoint" in current_url:
+                    if "checkpoint" in current_url or "two_step" in current_url:
+                        checkpoint_profiles.append(p_name)
+                        state.app_config[f"status_{p_name}"] = "2FA"
+                    elif "login" in current_url:
                         offline_profiles.append(p_name)
+                        state.app_config[f"status_{p_name}"] = "Offline"
+                    else:
+                        state.app_config[f"status_{p_name}"] = "Ready"
                     force_kill_browser(driver)
             except Exception as e:
                 print(f"[Health Check Error] {p_name}: {e}")
                 offline_profiles.append(p_name)
+                state.app_config[f"status_{p_name}"] = "Offline"
 
+            state.save_config(state.app_config)
             self.progress.config(value=((i+1)/total)*100)
             self.root.update_idletasks()
 
         self.refresh_profiles()
         self.progress.config(value=0)
 
-        if offline_profiles:
-            msg = f"Found {len(offline_profiles)} offline/suspended profile(s):\n" + "\n".join(offline_profiles[:5])
-            if len(offline_profiles) > 5:
-                msg += "\n...and more."
-            show_alert(self.root, "Health Check Completed", msg, "error")
+        if offline_profiles or checkpoint_profiles:
+            msg = f"{len(offline_profiles)} offline. {len(checkpoint_profiles)} on 2FA checkpoint.\n"
+            show_alert(self.root, "Health Check Complete", msg, "error")
         else:
             play_success_sound()
-            show_alert(self.root, "Health Check Completed", "All selected profiles are fully logged in and healthy!", "success")
+            show_alert(self.root, "Health Check Complete", "All selected profiles are logged in and healthy!", "success")
 
     def bulk_clear_cache(self):
         selected = self.get_selected_profiles()
@@ -827,9 +903,27 @@ class ControlPanel:
 
 
         # Tab 1
-        Label(tab1, text="Product Title:", bg=state.BG_PANEL, fg=state.FG_TEXT, font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(15,0), padx=15)
+        Label(tab1, text="Product Title Strategy:", bg=state.BG_PANEL, fg=state.FG_TEXT, font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(15,0), padx=15)
+
+        self.title_strategy = StringVar(value="manual")
+        Radiobutton(tab1, text="Manual Single Title:", variable=self.title_strategy, value="manual", bg=state.BG_PANEL, font=("Segoe UI", 10)).pack(anchor="w", padx=25, pady=(5,0))
         self.title_ent = Entry(tab1, width=60, font=("Segoe UI", 10))
-        self.title_ent.pack(padx=15, pady=5)
+        self.title_ent.pack(padx=25, pady=5)
+
+        Radiobutton(tab1, text="Auto-Randomize Titles from list (.txt)", variable=self.title_strategy, value="list", bg=state.BG_PANEL, font=("Segoe UI", 10)).pack(anchor="w", padx=25, pady=(10,0))
+
+        list_title_frame = Frame(tab1, bg=state.BG_PANEL)
+        list_title_frame.pack(fill=X, padx=25)
+        HoverButton(list_title_frame, text="Browse Titles File (.txt)", hover_color="#CBD5E1", command=self.pick_multi_listing_title_file, bg="#E2E8F0", fg=state.FG_TEXT, font=("Segoe UI", 9), relief="solid", bd=1, padx=10, cursor="hand2").pack(side=LEFT, pady=5)
+
+        self.lbl_title_file_status = Label(list_title_frame, text="Status: Manual Strategy Enabled", bg=state.BG_PANEL, fg=state.BTN_BLUE, font=("Segoe UI", 9))
+        self.lbl_title_file_status.pack(side=LEFT, padx=10)
+
+        Label(tab1, text="Drafts Multiplier:", bg=state.BG_PANEL, fg=state.FG_TEXT, font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(15,0), padx=15)
+        Label(tab1, text="How many drafts to create per profile (images will be shuffled):", bg=state.BG_PANEL, fg=state.FG_TEXT, font=("Segoe UI", 8)).pack(anchor="w", padx=15)
+        self.drafts_multiplier_ent = Entry(tab1, width=15, font=("Segoe UI", 10))
+        self.drafts_multiplier_ent.insert(0, "1")
+        self.drafts_multiplier_ent.pack(anchor="w", padx=15, pady=5)
 
         Label(tab1, text="Product Price:", bg=state.BG_PANEL, fg=state.FG_TEXT, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=15, pady=(10,0))
         self.price_ent = Entry(tab1, width=60, font=("Segoe UI", 10))
@@ -934,6 +1028,13 @@ class ControlPanel:
             self.lbl_loc_file_status.config(text=f"List Loaded: {os.path.basename(path)}")
             self.loc_strategy.set("list")
 
+    def pick_multi_listing_title_file(self):
+        path = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")], parent=self.form)
+        if path:
+            self.multi_listing_title_file_path = path
+            self.lbl_title_file_status.config(text=f"List Loaded: {os.path.basename(path)}")
+            self.title_strategy.set("list")
+
     def pick_multi_images(self):
         paths = filedialog.askopenfilenames(parent=self.form)
         if paths:
@@ -1025,14 +1126,29 @@ class ControlPanel:
 
     def commit_bulk_listing_task(self, profiles):
         strat = self.loc_strategy.get()
+        title_strat = self.title_strategy.get()
         details = {
             "title": self.title_ent.get(), "price": self.price_ent.get(), "category": self.cat_var.get(),
             "condition": self.cond_var.get(), "availability": self.avail_var.get(), "desc": self.desc_ent.get("1.0", "end-1c"),
             "tags": self.tags_ent.get(), "public_meetup": self.meet_pub.get(), "door_pickup": self.meet_door.get(), "images": self.img_paths_list
         }
 
-        if not details["title"] or not details["images"]:
-            show_alert(self.form, "Deployment Error", "Listing requires Title and Visual Assets (Images). Provide them.", "error")
+        if title_strat == "manual":
+            if not details["title"] or not details["images"]:
+                show_alert(self.form, "Deployment Error", "Listing requires Title and Visual Assets (Images). Provide them.", "error")
+                return
+            details["title_type"] = "manual"
+        else:
+            if not hasattr(self, 'multi_listing_title_file_path') or not self.multi_listing_title_file_path:
+                show_alert(self.form, "Strategy Error", "List strategy selected for title but no text file provided.", "error")
+                return
+            details["title_type"] = "file"
+            details["title_file"] = self.multi_listing_title_file_path
+
+        try:
+            details["drafts_multiplier"] = int(self.drafts_multiplier_ent.get())
+        except ValueError:
+            show_alert(self.form, "Deployment Error", "Drafts Multiplier must be an integer.", "error")
             return
 
         if strat == "manual":

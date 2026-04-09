@@ -9,8 +9,26 @@ NEW_MESSAGES_EVENT = False
 import os
 
 # Configs
-DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK", "YOUR_DISCORD_WEBHOOK_HERE")
-BASE_PATH = r"C:\Work\Profiles"
+import json
+
+CONFIG_FILE = "config.json"
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+def save_config(config):
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f)
+
+app_config = load_config()
+
+DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK", app_config.get("discord_webhook", "YOUR_DISCORD_WEBHOOK_HERE"))
+BASE_PATH = app_config.get("profiles_dir", None)
 
 CATEGORIES = [
     "Tools", "Furniture", "Household", "Garden", "Appliances", "Video Games", "Books, Movies & Music",

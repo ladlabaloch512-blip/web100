@@ -11,11 +11,25 @@ driver_setup_lock = threading.Lock()
 browser_init_lock = threading.Lock()
 CACHED_DRIVER_PATH = None
 
+import subprocess
+
 def launch_browser(profile_name, base_path, state_module):
     global CACHED_DRIVER_PATH
     chrome_version = get_chrome_major_version()
-    current_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
-    local_driver_path = os.path.join(current_dir, f"chromedriver_v{chrome_version}.exe")
+    # Use the directory where the application is running from
+    current_dir = os.getcwd()
+    local_driver_path = os.path.join(current_dir, "chromedriver.exe")
+
+    # We check if chromedriver.exe exists and matches the version.
+    # To check version we can run `chromedriver.exe --version`
+    download_needed = True
+    if os.path.exists(local_driver_path):
+        try:
+            output = subprocess.check_output([local_driver_path, "--version"], stderr=subprocess.STDOUT, text=True)
+            if f"ChromeDriver {chrome_version}" in output:
+                download_needed = False
+        except Exception:
+            pass
 
     fp = get_or_create_fingerprint(profile_name, base_path)
 
@@ -32,7 +46,7 @@ def launch_browser(profile_name, base_path, state_module):
     options.add_argument("--disable-dev-shm-usage")
 
     with driver_setup_lock:
-        if not os.path.exists(local_driver_path):
+        if download_needed:
             print(f"[SYSTEM] Fetching ChromeDriver v{chrome_version}...")
             patcher = uc_patcher.Patcher(version_main=chrome_version)
             patcher.auto()

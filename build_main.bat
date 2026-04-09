@@ -4,8 +4,8 @@ pip install Pillow undetected-chromedriver psutil requests pyinstaller
 
 echo.
 echo Building Abiz Global Enterprise Main Executable...
-pyinstaller --noconfirm --onedir --windowed --add-data "src;src/"  "main.py"
+pyinstaller --noconfirm --onefile --noconsole --windowed --add-data "src;src/"  "main.py"
 
 echo.
-echo Build complete. The executable is located in the "dist\main" folder.
+echo Build complete. The standalone executable is located in the "dist" folder.
 pause
