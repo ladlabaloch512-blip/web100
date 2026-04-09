@@ -66,26 +66,6 @@ class ControlPanel:
         right_pane = Frame(main_layout, bg=state.BG_APP)
         right_pane.pack(side=RIGHT, fill=BOTH, expand=True)
 
-        scanner_frame = Frame(right_pane, bg=state.BG_PANEL, bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)
-        scanner_frame.pack(fill=BOTH, expand=True, pady=(0, 15))
-
-        stf = Frame(scanner_frame, bg=state.BG_PANEL)
-        stf.pack(fill=X, pady=10, padx=15)
-        Label(stf, text="📋 PROFILE DIRECTORY (SCANNER)", font=("Segoe UI", 13, "bold"), fg=state.FG_TEXT, bg=state.BG_PANEL).pack(side=LEFT)
-        HoverButton(stf, text="🔄 Refresh", hover_color="#CBD5E1", command=self.refresh_profiles, bg="#E2E8F0", fg=state.FG_TEXT, font=("Segoe UI", 9, "bold"), relief="flat", padx=10, cursor="hand2").pack(side=RIGHT, padx=(5,0))
-        HoverButton(stf, text="Select All", hover_color="#CBD5E1", command=self.select_all, bg="#E2E8F0", fg=state.FG_TEXT, font=("Segoe UI", 9, "bold"), relief="flat", padx=10, cursor="hand2").pack(side=RIGHT)
-
-        canvas_frame = Frame(scanner_frame, bg=state.BG_PANEL)
-        canvas_frame.pack(fill=BOTH, expand=True, padx=15, pady=(0, 15))
-        self.canvas = Canvas(canvas_frame, bg=state.BG_PANEL, highlightthickness=0)
-        scrollbar = Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
-        self.scrollable_frame = Frame(self.canvas, bg=state.BG_PANEL)
-        self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
-        self.canvas.configure(yscrollcommand=scrollbar.set)
-        self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
-        scrollbar.pack(side=RIGHT, fill=Y)
-
         # Create Notebook for Main Tabs
         self.notebook = ttk.Notebook(right_pane)
         self.notebook.pack(fill=BOTH, expand=True)
@@ -113,6 +93,21 @@ class ControlPanel:
         self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
         self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Mousewheel binding (cross-platform handling including touchpads)
+        def _on_mousewheel(event):
+            if hasattr(event, "delta") and event.delta:
+                self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            elif hasattr(event, "num"):
+                if event.num == 4:
+                    self.canvas.yview_scroll(-1, "units")
+                elif event.num == 5:
+                    self.canvas.yview_scroll(1, "units")
+
+        self.canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        self.canvas.bind_all("<Button-4>", _on_mousewheel)
+        self.canvas.bind_all("<Button-5>", _on_mousewheel)
+
         self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
         scrollbar.pack(side=RIGHT, fill=Y)
 
@@ -234,6 +229,19 @@ class ControlPanel:
         self.msg_profiles_canvas.create_window((0, 0), window=self.msg_profiles_inner, anchor="nw")
         self.msg_profiles_canvas.configure(yscrollcommand=self.msg_profiles_scrollbar.set)
 
+        def _on_mousewheel_msg_profiles(event):
+            if hasattr(event, "delta") and event.delta:
+                self.msg_profiles_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            elif hasattr(event, "num"):
+                if event.num == 4:
+                    self.msg_profiles_canvas.yview_scroll(-1, "units")
+                elif event.num == 5:
+                    self.msg_profiles_canvas.yview_scroll(1, "units")
+
+        self.msg_profiles_canvas.bind_all("<MouseWheel>", _on_mousewheel_msg_profiles)
+        self.msg_profiles_canvas.bind_all("<Button-4>", _on_mousewheel_msg_profiles)
+        self.msg_profiles_canvas.bind_all("<Button-5>", _on_mousewheel_msg_profiles)
+
         self.msg_profiles_canvas.pack(side=LEFT, fill=BOTH, expand=True, padx=5)
         self.msg_profiles_scrollbar.pack(side=RIGHT, fill=Y)
 
@@ -251,6 +259,19 @@ class ControlPanel:
         self.msg_inner_frame.bind("<Configure>", lambda e: self.msg_canvas.configure(scrollregion=self.msg_canvas.bbox("all")))
         self.msg_canvas.create_window((0, 0), window=self.msg_inner_frame, anchor="nw")
         self.msg_canvas.configure(yscrollcommand=self.msg_scrollbar.set)
+
+        def _on_mousewheel_msg_chats(event):
+            if hasattr(event, "delta") and event.delta:
+                self.msg_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            elif hasattr(event, "num"):
+                if event.num == 4:
+                    self.msg_canvas.yview_scroll(-1, "units")
+                elif event.num == 5:
+                    self.msg_canvas.yview_scroll(1, "units")
+
+        self.msg_canvas.bind_all("<MouseWheel>", _on_mousewheel_msg_chats)
+        self.msg_canvas.bind_all("<Button-4>", _on_mousewheel_msg_chats)
+        self.msg_canvas.bind_all("<Button-5>", _on_mousewheel_msg_chats)
 
         self.msg_canvas.pack(side=LEFT, fill=BOTH, expand=True, padx=10, pady=10)
         self.msg_scrollbar.pack(side=RIGHT, fill=Y)
@@ -486,12 +507,13 @@ class ControlPanel:
             custom_frame = Frame(sf, bg=state.BG_PANEL)
             custom_frame.pack(anchor="w", padx=40, pady=5)
             Radiobutton(custom_frame, text="Custom URL:", variable=target_var, value="custom", bg=state.BG_PANEL).pack(side=LEFT)
-            Entry(custom_frame, width=30).pack(side=LEFT)
+            custom_url_entry = Entry(custom_frame, width=30)
+            custom_url_entry.pack(side=LEFT)
 
             def launch_sf():
                 t = target_var.get()
+                url = "https://web.facebook.com" if t == "fb" else "about:blank" if t == "blank" else custom_url_entry.get()
                 sf.destroy()
-                url = "https://web.facebook.com" if t == "fb" else "about:blank" if t == "blank" else custom_frame.winfo_children()[1].get()
                 threading.Thread(target=worker_task, args=(p_name, "manual", {"url": url}), daemon=True).start()
 
             HoverButton(sf, text="Launch Immediately", command=launch_sf, bg=state.BTN_GREEN, hover_color=state.BTN_GREEN_HOVER, fg="white", font=("Segoe UI", 10, "bold"), relief="flat").pack(pady=20)
@@ -526,11 +548,12 @@ class ControlPanel:
         custom_frame = Frame(sf, bg=state.BG_PANEL)
         custom_frame.pack(anchor="w", padx=40, pady=5)
         Radiobutton(custom_frame, text="Custom URL:", variable=target_var, value="custom", bg=state.BG_PANEL).pack(side=LEFT)
-        Entry(custom_frame, width=30).pack(side=LEFT)
+        custom_url_entry2 = Entry(custom_frame, width=30)
+        custom_url_entry2.pack(side=LEFT)
 
         def queue_manual_launch():
             t = target_var.get()
-            url = "https://web.facebook.com" if t == "fb" else "about:blank" if t == "blank" else custom_frame.winfo_children()[1].get()
+            url = "https://web.facebook.com" if t == "fb" else "about:blank" if t == "blank" else custom_url_entry2.get()
             sf.destroy()
             self.add_automated_to_queue(selected, "manual", {"url": url})
 

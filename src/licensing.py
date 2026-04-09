@@ -78,14 +78,14 @@ def show_activation_screen(error_msg="Software Locked"):
 
     # Main Content Area
     content = tk.Frame(root, bg="#FFFFFF", bd=1, relief="solid", highlightbackground="#E2E8F0", highlightthickness=1)
-    content.pack(fill=tk.BOTH, expand=True, padx=30, pady=30)
+    content.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
 
-    tk.Label(content, text="🔒 " + error_msg, font=("Segoe UI", 12, "bold"), fg="#DC2626", bg="#FFFFFF").pack(pady=(20, 10))
-    tk.Label(content, text="To use this software, you need a valid license file.\nPlease provide your Hardware ID to the administrator.", font=("Segoe UI", 10), fg="#475569", bg="#FFFFFF", justify="center").pack(pady=(0, 20))
+    tk.Label(content, text="🔒 Software Locked", font=("Segoe UI", 14, "bold"), fg="#DC2626", bg="#FFFFFF").pack(pady=(10, 5))
+    tk.Label(content, text="To use this software, you need a valid license file.\nPlease provide your Hardware ID to the administrator.", font=("Segoe UI", 10), fg="#475569", bg="#FFFFFF", justify="center").pack(pady=(0, 10))
 
     # UUID Area
     uuid_frame = tk.Frame(content, bg="#F1F5F9", bd=1, relief="solid", highlightbackground="#CBD5E1", highlightthickness=1)
-    uuid_frame.pack(fill=tk.X, padx=20, pady=10)
+    uuid_frame.pack(fill=tk.X, padx=10, pady=5)
 
     tk.Label(uuid_frame, text="Your Hardware ID:", font=("Segoe UI", 9, "bold"), fg="#1E293B", bg="#F1F5F9").pack(anchor="w", padx=10, pady=(10, 0))
 
