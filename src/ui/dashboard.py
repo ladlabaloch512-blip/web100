@@ -280,9 +280,9 @@ class ControlPanel:
         self.msg_canvas.bind("<MouseWheel>", _on_mousewheel_msg_chats)
         self.msg_canvas.bind("<Button-4>", _on_mousewheel_msg_chats)
         self.msg_canvas.bind("<Button-5>", _on_mousewheel_msg_chats)
-        self.msg_inner.bind("<MouseWheel>", _on_mousewheel_msg_chats)
-        self.msg_inner.bind("<Button-4>", _on_mousewheel_msg_chats)
-        self.msg_inner.bind("<Button-5>", _on_mousewheel_msg_chats)
+        self.msg_inner_frame.bind("<MouseWheel>", _on_mousewheel_msg_chats)
+        self.msg_inner_frame.bind("<Button-4>", _on_mousewheel_msg_chats)
+        self.msg_inner_frame.bind("<Button-5>", _on_mousewheel_msg_chats)
 
         self.msg_canvas.pack(side=LEFT, fill=BOTH, expand=True, padx=10, pady=10)
         self.msg_scrollbar.pack(side=RIGHT, fill=Y)
