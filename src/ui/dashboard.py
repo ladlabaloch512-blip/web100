@@ -341,6 +341,7 @@ class ControlPanel:
             header = Frame(card, bg="#E2E8F0")
             header.pack(fill=X)
             Label(header, text=f"💬 {chat['target']}", font=("Segoe UI", 11, "bold"), bg="#E2E8F0", fg=state.FG_TEXT).pack(side=LEFT, padx=10, pady=5)
+            Label(header, text=f"({p_name})", font=("Segoe UI", 9, "italic"), bg="#E2E8F0", fg="#64748B").pack(side=RIGHT, padx=10, pady=5)
 
             msg_area = Frame(card, bg="#F8FAFC")
             msg_area.pack(fill=X, padx=10, pady=10)
