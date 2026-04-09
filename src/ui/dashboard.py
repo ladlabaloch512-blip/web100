@@ -661,7 +661,7 @@ class ControlPanel:
 
         self.form = Toplevel(self.root)
         self.form.title("Queued Listing Deployment Configurator")
-        self.form.geometry("550x780")
+        self.form.geometry("650x850")
         self.form.configure(bg=state.BG_APP)
         Frame(self.form, bg=state.BTN_ORANGE, height=6).pack(fill=X, side=TOP)
 
@@ -669,10 +669,15 @@ class ControlPanel:
         notebook.pack(fill=BOTH, expand=True, padx=15, pady=15)
 
         tab1 = Frame(notebook, bg=state.BG_PANEL)
+        tab1.pack(fill=BOTH, expand=True)
         notebook.add(tab1, text=" Basic Configuration ")
+
         tab2 = Frame(notebook, bg=state.BG_PANEL)
+        tab2.pack(fill=BOTH, expand=True)
         notebook.add(tab2, text=" Taxonomy & Description ")
+
         tab3 = Frame(notebook, bg=state.BG_PANEL)
+        tab3.pack(fill=BOTH, expand=True)
         notebook.add(tab3, text=" Settings & Deploy ")
 
         # Tab 1
@@ -703,6 +708,20 @@ class ControlPanel:
         self.thumbs_frame.bind("<Configure>", lambda e: self.thumbs_canvas.configure(scrollregion=self.thumbs_canvas.bbox("all")))
         self.thumbs_canvas.create_window((0, 0), window=self.thumbs_frame, anchor="nw")
         self.thumbs_canvas.configure(yscrollcommand=self.thumbs_scrollbar.set)
+
+        def _on_mousewheel_thumbs(event):
+            if hasattr(event, "delta") and event.delta:
+                self.thumbs_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            elif hasattr(event, "num"):
+                if event.num == 4:
+                    self.thumbs_canvas.yview_scroll(-1, "units")
+                elif event.num == 5:
+                    self.thumbs_canvas.yview_scroll(1, "units")
+
+        self.thumbs_canvas.bind_all("<MouseWheel>", _on_mousewheel_thumbs)
+        self.thumbs_canvas.bind_all("<Button-4>", _on_mousewheel_thumbs)
+        self.thumbs_canvas.bind_all("<Button-5>", _on_mousewheel_thumbs)
+
         self.thumbs_canvas.pack(side=LEFT, fill=BOTH, expand=True)
         self.thumbs_scrollbar.pack(side=RIGHT, fill=Y)
 
