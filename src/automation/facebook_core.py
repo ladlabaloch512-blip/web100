@@ -152,12 +152,22 @@ def perform_listing(driver, details, p_name, state):
                 print(f"[{p_name}] ⚠️ Fallback Category dropdown: {e}")
 
             try:
-                # Pure Javascript automation to find and click the Condition combobox
+                # Pure Javascript automation to aggressively crawl the DOM layout for the Condition combobox
                 js_open_condition = """
                 var spans = document.querySelectorAll('span');
                 for (var i = 0; i < spans.length; i++) {
-                    if (spans[i].innerText && spans[i].innerText.toLowerCase() === 'condition') {
-                        var combobox = spans[i].closest('label').querySelector('div[role="combobox"]');
+                    if (spans[i].innerText && spans[i].innerText.trim().toLowerCase() === 'condition') {
+                        var node = spans[i];
+                        // Walk up looking for a label, or up to 4 parents if no label
+                        var wrapper = node.closest('label');
+                        if (!wrapper) {
+                            wrapper = node.parentElement;
+                            for (var j = 0; j < 3; j++) { if(wrapper.parentElement) wrapper = wrapper.parentElement; }
+                        }
+
+                        var combobox = wrapper.querySelector('div[role="combobox"]') ||
+                                       wrapper.querySelector('div[tabindex="0"]') ||
+                                       wrapper.querySelector('div[role="button"]');
                         if (combobox) {
                             combobox.scrollIntoView({block: 'center'});
                             combobox.click();
@@ -169,7 +179,13 @@ def perform_listing(driver, details, p_name, state):
                 """
                 success = driver.execute_script(js_open_condition)
                 if not success:
-                    raise Exception("Could not find condition combobox via JS")
+                    print(f"[{p_name}] ⚠️ JS combobox finder failed, falling back to XPath...")
+                    # Fallback XPath 1: Click directly using the aria-label label mapping
+                    condition_label_xpath = "//label[contains(@aria-label, 'Condition')] | //span[text()='Condition' or text()='condition']/ancestor::label"
+                    condition_btn = wait_and_find(driver, condition_label_xpath, state, timeout=10)
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", condition_btn)
+                    time.sleep(0.5)
+                    driver.execute_script("arguments[0].click();", condition_btn)
                 time.sleep(1.5)
 
                 # The dropdown menu opens at the end of the body in a portal
@@ -186,7 +202,7 @@ def perform_listing(driver, details, p_name, state):
                 """
                 success = driver.execute_script(js_select_condition)
                 if not success:
-                    print(f"[{p_name}] ⚠️ Could not find exact condition text '{target_condition}', trying XPath...")
+                    print(f"[{p_name}] ⚠️ JS option selector failed for '{target_condition}', trying XPath...")
                     condition_option_xpath = f"//div[@role='option']//span[text()='{target_condition}'] | //span[text()='{target_condition}']"
                     condition_opt = wait_and_find(driver, condition_option_xpath, state, timeout=5)
                     driver.execute_script("arguments[0].click();", condition_opt)
