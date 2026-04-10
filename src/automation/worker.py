@@ -29,6 +29,31 @@ def worker_task(p_name, task_type, details=None, email=None, pwd=None, progress_
             res = perform_human_activity(driver, p_name, state, duration)
             if res:
                 state.update_status(p_name, "✅ Warmed Up")
+        elif task_type == "health_check":
+            from selenium.webdriver.common.by import By
+            from src.automation.selenium_utils import wait_for_page_load
+
+            driver.get("https://web.facebook.com")
+            wait_for_page_load(driver, state)
+            time.sleep(5)
+
+            current_url = driver.current_url.lower()
+            try:
+                body_text = driver.find_element(By.TAG_NAME, "body").text.lower()
+            except:
+                body_text = ""
+
+            if "suspended" in body_text or "disabled" in current_url:
+                state.app_config[f"status_{p_name}"] = "🔴 Disabled"
+            elif "checkpoint" in current_url or "two_step" in current_url or "challenge" in current_url:
+                state.app_config[f"status_{p_name}"] = "🟡 Checkpoint"
+            elif "login" in current_url or "incorrect" in body_text:
+                state.app_config[f"status_{p_name}"] = "⚪ Logged Out"
+            else:
+                state.app_config[f"status_{p_name}"] = "🟢 Ready"
+
+            state.save_config(state.app_config)
+
         elif task_type == "manual":
             perform_manual(driver, p_name, details.get("url", "https://web.facebook.com"), state)
     except Exception as e:

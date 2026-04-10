@@ -893,62 +893,15 @@ class ControlPanel:
         if not selected:
             return
 
-        self.progress.config(value=0)
-        total = len(selected)
-        offline_profiles = []
-        checkpoint_profiles = []
+        threads = self.ask_thread_count(len(selected))
+        if not threads:
+            return
 
-        show_alert(self.root, "Health Check Started", f"Will verify {total} profiles. Browsers will open and close. Please wait...", "info")
+        self.add_automated_to_queue(selected, "health_check")
 
-        for i, p_name in enumerate(selected):
-            try:
-                # Basic check first
-                if not check_login_status(p_name, state.BASE_PATH):
-                    offline_profiles.append(p_name)
-                    state.app_config[f"status_{p_name}"] = "⚪ Logged Out"
-                else:
-                    # Actually open the browser and verify by looking at the page
-                    driver = launch_browser(p_name, state.BASE_PATH, state)
-                    driver.get("https://web.facebook.com")
-                    wait_for_page_load(driver, state)
-                    time.sleep(5)
-
-                    current_url = driver.current_url.lower()
-                    try:
-                        body_text = driver.find_element(By.TAG_NAME, "body").text.lower()
-                    except:
-                        body_text = ""
-
-                    if "suspended" in body_text or "disabled" in current_url:
-                        offline_profiles.append(p_name)
-                        state.app_config[f"status_{p_name}"] = "🔴 Disabled"
-                    elif "checkpoint" in current_url or "two_step" in current_url or "challenge" in current_url:
-                        checkpoint_profiles.append(p_name)
-                        state.app_config[f"status_{p_name}"] = "🟡 Checkpoint"
-                    elif "login" in current_url or "incorrect" in body_text:
-                        offline_profiles.append(p_name)
-                        state.app_config[f"status_{p_name}"] = "⚪ Logged Out"
-                    else:
-                        state.app_config[f"status_{p_name}"] = "🟢 Ready"
-                    force_kill_browser(driver)
-            except Exception as e:
-                print(f"[Health Check Error] {p_name}: {e}")
-                offline_profiles.append(p_name)
-                state.app_config[f"status_{p_name}"] = "⚪ Logged Out"
-
-            state.save_config(state.app_config)
-            self.progress.config(value=((i+1)/total)*100)
-            self.root.update_idletasks()
-
-        self.refresh_profiles()
-        self.progress.config(value=0)
-
-        if offline_profiles or checkpoint_profiles:
-            msg = f"{len(offline_profiles)} offline. {len(checkpoint_profiles)} on 2FA checkpoint.\n"
-            show_alert(self.root, "Health Check Complete", msg, "error")
-        else:
-            play_success_sound()
-            show_alert(self.root, "Health Check Complete", "All selected profiles are logged in and healthy!", "success")
+        # We start the master queue automatically for health checks
+        if state.TASK_QUEUE:
+            threading.Thread(target=execute_queue_automated, args=(threads, self.root, self.progress, self.refresh_profiles), daemon=True).start()
 
     def bulk_clear_cache(self):
         selected = self.get_selected_profiles()
