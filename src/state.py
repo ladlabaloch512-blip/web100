@@ -25,6 +25,10 @@ def save_config(config):
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f)
 
+def update_status(profile_name, status):
+    app_config[f"status_{profile_name}"] = status
+    save_config(app_config)
+
 app_config = load_config()
 
 DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK", app_config.get("discord_webhook", "YOUR_DISCORD_WEBHOOK_HERE"))

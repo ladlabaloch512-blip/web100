@@ -317,9 +317,11 @@ def perform_listing(driver, details, p_name, state):
 
                     if direct_publish:
                         print(f"✅ [{p_name}] Listing POSTED and PUBLISHED successfully!")
+                        state.update_status(p_name, "✅ Published")
                         time.sleep(10)
                     else:
                         print(f"✅ [{p_name}] Listing saved as Draft successfully!")
+                        state.update_status(p_name, "✅ Drafted")
                         time.sleep(10) # wait for redirect back to marketplace home or listing page
 
                         # Capture Draft URL
@@ -343,11 +345,72 @@ def perform_listing(driver, details, p_name, state):
 
                 except Exception as e:
                     print(f"❌ [{p_name}] Failed to complete listing action: {e}")
+                    state.update_status(p_name, "❌ Listing Failed")
                     time.sleep(15)
 
         except Exception as e:
             if not state.GLOBAL_STOP:
                 print(f"❌ [{p_name}] Error during UI listing: {e}")
+                state.update_status(p_name, "❌ Script Error")
                 time.sleep(15)
 
     return True
+import time
+import random
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from src.automation.selenium_utils import wait_for_page_load
+import src.state as state
+
+def perform_human_activity(driver, p_name, state_module):
+    print(f"🚶‍♂️ [{p_name}] Starting Human Activity (Warm-up) process...")
+    try:
+        driver.get("https://web.facebook.com")
+        wait_for_page_load(driver, state_module)
+        time.sleep(random.uniform(5, 8))
+
+        # Check if we are on the login page or checkpoint
+        current_url = driver.current_url.lower()
+        if "login" in current_url or "checkpoint" in current_url:
+            print(f"⚠️ [{p_name}] Cannot perform human activity: Account is not logged in or is on checkpoint.")
+            return False
+
+        print(f"[{p_name}] Browsing feed...")
+        scroll_count = random.randint(10, 25)
+        likes_done = 0
+        target_likes = random.randint(1, 4)
+
+        for i in range(scroll_count):
+            if state_module.GLOBAL_STOP:
+                return False
+
+            # Scroll down randomly
+            scroll_amt = random.randint(300, 900)
+            driver.execute_script(f"window.scrollBy(0, {scroll_amt});")
+
+            # Pause to "read"
+            time.sleep(random.uniform(1.5, 4.5))
+
+            # Occasional Like
+            if likes_done < target_likes and random.random() < 0.15:
+                try:
+                    like_btns = driver.find_elements(By.XPATH, "//div[@aria-label='Like' and @role='button']")
+                    if like_btns:
+                        target = random.choice(like_btns)
+                        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target)
+                        time.sleep(random.uniform(0.5, 1.5))
+                        driver.execute_script("arguments[0].click();", target)
+                        likes_done += 1
+                        print(f"👍 [{p_name}] Liked a post! ({likes_done}/{target_likes})")
+                        time.sleep(random.uniform(1.0, 3.0))
+                except Exception as e:
+                    pass
+
+        print(f"✅ [{p_name}] Human Activity complete. Scrolled {scroll_count} times, liked {likes_done} posts.")
+        return True
+
+    except Exception as e:
+        print(f"❌ [{p_name}] Error during Human Activity: {e}")
+        return False

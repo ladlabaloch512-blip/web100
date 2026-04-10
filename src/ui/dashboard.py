@@ -66,6 +66,8 @@ class ControlPanel:
 
         HoverButton(bulk_auto_frame, text="📢 Publish Pending Drafts", hover_color="#14b8a6", command=self.prepare_publish_drafts_queued, bg="#0d9488", fg="white", font=("Segoe UI", 10, "bold"), relief="flat", height=2, cursor="hand2").pack(fill=X, padx=20, pady=6)
 
+        HoverButton(bulk_auto_frame, text="🚶‍♂️ Queued Human Activity", hover_color="#a855f7", command=self.prepare_human_activity_queued, bg="#c084fc", fg="white", font=("Segoe UI", 10, "bold"), relief="flat", height=2, cursor="hand2").pack(fill=X, padx=20, pady=6)
+
         HoverButton(bulk_auto_frame, text="📬 LIVE MESSAGES HUB", hover_color="#4F46E5", command=self.open_messenger_hub, bg="#4338CA", fg="white", font=("Segoe UI", 10, "bold"), relief="flat", height=2, cursor="hand2").pack(fill=X, padx=20, pady=(6,0))
         Label(bulk_auto_frame, text="", bg=state.BG_PANEL).pack()
 
@@ -520,7 +522,7 @@ class ControlPanel:
         header_row.pack(fill=X, pady=(0, 5))
         Label(header_row, text="", width=4, bg=state.BG_PANEL).pack(side=LEFT)
         Label(header_row, text="PROFILE NAME", font=("Segoe UI", 9, "bold"), fg="#64748B", bg=state.BG_PANEL, anchor="w", width=20).pack(side=LEFT)
-        Label(header_row, text="STATUS", font=("Segoe UI", 9, "bold"), fg="#64748B", bg=state.BG_PANEL, anchor="w", width=15).pack(side=LEFT)
+        Label(header_row, text="STATUS", font=("Segoe UI", 9, "bold"), fg="#64748B", bg=state.BG_PANEL, anchor="w", width=25).pack(side=LEFT)
         Label(header_row, text="INDIVIDUAL ACTIONS", font=("Segoe UI", 9, "bold"), fg="#64748B", bg=state.BG_PANEL).pack(side=LEFT)
 
         for p in folders:
@@ -536,17 +538,26 @@ class ControlPanel:
 
             cached_status = state.app_config.get(f"status_{p}", None)
 
-            if cached_status == "2FA":
-                status_text = "⚠️ 2FA"
+            if cached_status == "2FA" or cached_status == "🟡 Checkpoint":
+                status_text = "🟡 Checkpoint"
                 color = state.BTN_ORANGE
-            elif cached_status == "Offline" or not logged_in:
-                status_text = "⚪ Offline"
+            elif cached_status == "🔴 Disabled":
+                status_text = "🔴 Disabled"
+                color = state.BTN_RED
+            elif cached_status == "Offline" or cached_status == "⚪ Logged Out" or not logged_in:
+                status_text = "⚪ Logged Out"
                 color = "#9CA3AF"
+            elif cached_status and "❌" in cached_status:
+                status_text = cached_status
+                color = state.BTN_RED
+            elif cached_status and "✅" in cached_status:
+                status_text = cached_status
+                color = state.BTN_GREEN
             else:
                 status_text = "🟢 Ready"
                 color = state.BTN_GREEN
 
-            Label(row, text=status_text, font=("Segoe UI", 9, "bold"), fg=color, bg=state.BG_PANEL, anchor="w", width=13).pack(side=LEFT, padx=5)
+            Label(row, text=status_text, font=("Segoe UI", 9, "bold"), fg=color, bg=state.BG_PANEL, anchor="w", width=23).pack(side=LEFT, padx=5)
 
             btn_frame = Frame(row, bg=state.BG_PANEL)
             btn_frame.pack(side=LEFT)
@@ -704,6 +715,12 @@ class ControlPanel:
             return
         self.add_automated_to_queue(selected, "messenger")
 
+    def prepare_human_activity_queued(self):
+        selected = self.get_selected_profiles()
+        if not selected:
+            return
+        self.add_automated_to_queue(selected, "human_activity")
+
     def prepare_publish_drafts_queued(self):
         selected = self.get_selected_profiles()
         if not selected:
@@ -854,28 +871,36 @@ class ControlPanel:
                 # Basic check first
                 if not check_login_status(p_name, state.BASE_PATH):
                     offline_profiles.append(p_name)
-                    state.app_config[f"status_{p_name}"] = "Offline"
+                    state.app_config[f"status_{p_name}"] = "⚪ Logged Out"
                 else:
                     # Actually open the browser and verify by looking at the page
                     driver = launch_browser(p_name, state.BASE_PATH, state)
                     driver.get("https://web.facebook.com")
                     wait_for_page_load(driver, state)
-                    time.sleep(3)
+                    time.sleep(5)
 
                     current_url = driver.current_url.lower()
-                    if "checkpoint" in current_url or "two_step" in current_url:
-                        checkpoint_profiles.append(p_name)
-                        state.app_config[f"status_{p_name}"] = "2FA"
-                    elif "login" in current_url:
+                    try:
+                        body_text = driver.find_element(By.TAG_NAME, "body").text.lower()
+                    except:
+                        body_text = ""
+
+                    if "suspended" in body_text or "disabled" in current_url:
                         offline_profiles.append(p_name)
-                        state.app_config[f"status_{p_name}"] = "Offline"
+                        state.app_config[f"status_{p_name}"] = "🔴 Disabled"
+                    elif "checkpoint" in current_url or "two_step" in current_url or "challenge" in current_url:
+                        checkpoint_profiles.append(p_name)
+                        state.app_config[f"status_{p_name}"] = "🟡 Checkpoint"
+                    elif "login" in current_url or "incorrect" in body_text:
+                        offline_profiles.append(p_name)
+                        state.app_config[f"status_{p_name}"] = "⚪ Logged Out"
                     else:
-                        state.app_config[f"status_{p_name}"] = "Ready"
+                        state.app_config[f"status_{p_name}"] = "🟢 Ready"
                     force_kill_browser(driver)
             except Exception as e:
                 print(f"[Health Check Error] {p_name}: {e}")
                 offline_profiles.append(p_name)
-                state.app_config[f"status_{p_name}"] = "Offline"
+                state.app_config[f"status_{p_name}"] = "⚪ Logged Out"
 
             state.save_config(state.app_config)
             self.progress.config(value=((i+1)/total)*100)

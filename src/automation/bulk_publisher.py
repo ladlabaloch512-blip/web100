@@ -66,6 +66,7 @@ def publish_drafts(driver, p_name, tabs_count):
                     print(f"✅ [{p_name}] Clicked Publish for '{title}'!")
 
                     db.update_draft_status(listing_id, "Published")
+                    state.update_status(p_name, "✅ Bulk Published")
                     time.sleep(random.uniform(2, 4))
 
                     # Close the tab, remove from active tasks

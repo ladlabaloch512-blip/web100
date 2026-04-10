@@ -2,7 +2,7 @@ import time
 import src.state as state
 from src.utils.system_utils import check_login_status, force_kill_browser, smart_cleanup
 from src.browser.launcher import launch_browser
-from src.automation.facebook_core import perform_login, perform_listing, perform_manual
+from src.automation.facebook_core import perform_login, perform_listing, perform_manual, perform_human_activity
 from src.automation.messenger import monitor_messenger, send_messenger_reply
 from src.automation.bulk_publisher import publish_drafts
 
@@ -24,11 +24,16 @@ def worker_task(p_name, task_type, details=None, email=None, pwd=None, progress_
             monitor_messenger(driver, p_name, state)
         elif task_type == "messenger_reply":
             send_messenger_reply(driver, p_name, state, details)
+        elif task_type == "human_activity":
+            res = perform_human_activity(driver, p_name, state)
+            if res:
+                state.update_status(p_name, "✅ Warmed Up")
         elif task_type == "manual":
             perform_manual(driver, p_name, details.get("url", "https://web.facebook.com"), state)
     except Exception as e:
         if not state.GLOBAL_STOP:
             print(f"❌ CRITICAL ERROR on {p_name}: {e}")
+            state.update_status(p_name, "❌ Crashed")
     finally:
         if driver:
             if task_type == "login" and check_login_status(p_name, state.BASE_PATH):
