@@ -1,5 +1,76 @@
 import time
 import random
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from src.automation.selenium_utils import human_type, wait_for_page_load, wait_and_find, wait_and_click, js_click
+
+def perform_manual(driver, p_name, target_url, state):
+    try:
+        driver.get(target_url)
+        print(f"[{p_name}] Browser opened manually.")
+        while len(driver.window_handles) > 0:
+            if state.GLOBAL_STOP:
+                break
+            time.sleep(2)
+    except:
+        pass
+
+def perform_login(driver, email, password, p_name, state):
+    driver.get("https://web.facebook.com")
+    wait_for_page_load(driver, state)
+    time.sleep(3)
+    if state.GLOBAL_STOP:
+        return False
+
+    try:
+        email_field = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.NAME, "email")))
+        print(f"[{p_name}] Logging in...")
+        human_type(email_field, email, False, state)
+        pass_field = driver.find_element(By.NAME, "pass")
+        human_type(pass_field, password, False, state)
+        if state.GLOBAL_STOP:
+            return False
+        pass_field.send_keys(Keys.ENTER)
+        time.sleep(7)
+
+        max_wait_time = 300
+        start_time = time.time()
+        while time.time() - start_time < max_wait_time:
+            if state.GLOBAL_STOP:
+                return False
+            current_url = driver.current_url.lower()
+            try:
+                body_text = driver.find_element(By.TAG_NAME, "body").text.lower()
+            except:
+                body_text = ""
+
+            if "suspended" in body_text or "checkpoint/disabled" in current_url:
+                print(f"❌ [{p_name}] Account Suspended: {email}")
+                return False
+            if "login" in current_url and "incorrect" in body_text:
+                print(f"❌ [{p_name}] Invalid credentials: {email}")
+                return False
+            if "checkpoint" in current_url or "two_step" in current_url:
+                print(f"⚠️ [{p_name}] Captcha/2FA Required. Solve manually in browser...")
+                time.sleep(5)
+                continue
+            if "login" not in current_url and "checkpoint" not in current_url:
+                print(f"✅ [{p_name}] Login successful!")
+                return True
+            time.sleep(2)
+        return False
+    except:
+        if "facebook.com" in driver.current_url and "login" not in driver.current_url.lower():
+            print(f"✅ [{p_name}] Profile is already logged in!")
+            return True
+        else:
+            print(f"❌ [{p_name}] Failed to load Facebook login page.")
+            return False
+
+import time
+import random
 import json
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -9,7 +80,7 @@ from src.automation.selenium_utils import human_type, wait_for_page_load, wait_a
 import src.db_manager.database as db
 
 def perform_listing(driver, details, p_name, state):
-    print(f"🛒 [{p_name}] Starting UI-based drafting process...")
+    print(f"🛒 [{p_name}] Starting UI-based listing process...")
 
     titles_list = []
     if details.get("title_type") == "file":
@@ -23,12 +94,13 @@ def perform_listing(driver, details, p_name, state):
 
     drafts_multiplier = details.get("drafts_multiplier", 1)
     original_images = details.get('images', [])
+    direct_publish = details.get('direct_publish', False)
 
     for i in range(drafts_multiplier):
         if state.GLOBAL_STOP:
             return False
 
-        print(f"\n--- [{p_name}] Processing Draft {i+1} of {drafts_multiplier} ---")
+        print(f"\n--- [{p_name}] Processing Item {i+1} of {drafts_multiplier} ---")
 
         current_title = random.choice(titles_list)
         current_images = original_images.copy()
@@ -127,7 +199,7 @@ def perform_listing(driver, details, p_name, state):
 
             time.sleep(2)
             if not state.GLOBAL_STOP:
-                print(f"[{p_name}] Proceeding to Save Draft...")
+                print(f"[{p_name}] Proceeding...")
 
                 try:
                     next_btn_xpath = "//div[@aria-label='Next'] | //span[text()='Next'] | //div[@role='button']//span[text()='Next']"
@@ -140,42 +212,49 @@ def perform_listing(driver, details, p_name, state):
                     print(f"[{p_name}] Next button issue: {e}")
 
                 try:
-                    # Save Draft button logic
-                    draft_btn_xpath = "//div[@aria-label='Save draft'] | //span[text()='Save draft'] | //div[@role='button']//span[contains(text(), 'Save draft')]"
-                    draft_btn = wait_and_find(driver, draft_btn_xpath, state, timeout=10)
-                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", draft_btn)
+                    if direct_publish:
+                        action_btn_xpath = "//div[@aria-label='Publish'] | //span[text()='Publish'] | //div[@role='button']//span[contains(text(), 'Publish')]"
+                    else:
+                        action_btn_xpath = "//div[@aria-label='Save draft'] | //span[text()='Save draft'] | //div[@role='button']//span[contains(text(), 'Save draft')]"
+
+                    action_btn = wait_and_find(driver, action_btn_xpath, state, timeout=10)
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", action_btn)
                     time.sleep(1)
-                    driver.execute_script("arguments[0].click();", draft_btn)
+                    driver.execute_script("arguments[0].click();", action_btn)
 
-                    print(f"✅ [{p_name}] Listing saved as Draft successfully!")
-                    time.sleep(10) # wait for redirect back to marketplace home or listing page
+                    if direct_publish:
+                        print(f"✅ [{p_name}] Listing POSTED and PUBLISHED successfully!")
+                        time.sleep(10)
+                    else:
+                        print(f"✅ [{p_name}] Listing saved as Draft successfully!")
+                        time.sleep(10) # wait for redirect back to marketplace home or listing page
 
-                    # Capture Draft URL
-                    current_url = driver.current_url
-                    listing_id = current_url.rstrip('/').split('/')[-1] if 'item' in current_url else f"DRAFT_{int(time.time())}"
+                        # Capture Draft URL
+                        current_url = driver.current_url
+                        listing_id = current_url.rstrip('/').split('/')[-1] if 'item' in current_url else f"DRAFT_{int(time.time())}"
 
-                    if 'item' not in current_url:
-                        # Fallback if redirect doesn't land on the item page directly
-                        driver.get("https://web.facebook.com/marketplace/you/selling")
-                        time.sleep(5)
-                        try:
-                            first_item = driver.find_element(By.XPATH, "(//a[contains(@href, '/marketplace/item/')])[1]")
-                            current_url = first_item.get_attribute('href')
-                            listing_id = current_url.rstrip('/').split('/')[-1]
-                        except:
-                            print(f"⚠️ [{p_name}] Could not extract direct URL. Saving dummy URL.")
-                            current_url = f"https://web.facebook.com/marketplace/you/selling"
+                        if 'item' not in current_url:
+                            # Fallback if redirect doesn't land on the item page directly
+                            driver.get("https://web.facebook.com/marketplace/you/selling")
+                            time.sleep(5)
+                            try:
+                                first_item = driver.find_element(By.XPATH, "(//a[contains(@href, '/marketplace/item/')])[1]")
+                                current_url = first_item.get_attribute('href')
+                                listing_id = current_url.rstrip('/').split('/')[-1]
+                            except:
+                                print(f"⚠️ [{p_name}] Could not extract direct URL. Saving dummy URL.")
+                                current_url = f"https://web.facebook.com/marketplace/you/selling"
 
-                    db.insert_draft(p_name, listing_id, current_url, current_title, "Drafted")
-                    print(f"✅ [{p_name}] Draft URL saved to DB: {current_url}")
+                        db.insert_draft(p_name, listing_id, current_url, current_title, "Drafted")
+                        print(f"✅ [{p_name}] Draft URL saved to DB: {current_url}")
 
                 except Exception as e:
-                    print(f"❌ [{p_name}] Failed to click Save Draft: {e}")
+                    print(f"❌ [{p_name}] Failed to complete listing action: {e}")
                     time.sleep(15)
 
         except Exception as e:
             if not state.GLOBAL_STOP:
-                print(f"❌ [{p_name}] Error during UI drafting: {e}")
+                print(f"❌ [{p_name}] Error during UI listing: {e}")
                 time.sleep(15)
 
     return True

@@ -165,11 +165,14 @@ class ControlPanel:
         schedule_frame.pack(fill=X, padx=15, pady=(0, 10))
 
         self.schedule_var = BooleanVar()
-        Checkbutton(schedule_frame, text="Schedule execution at:", variable=self.schedule_var, bg=state.BG_PANEL, font=("Segoe UI", 9)).pack(side=LEFT)
+        Checkbutton(schedule_frame, text="Schedule Task", variable=self.schedule_var, bg=state.BG_PANEL, font=("Segoe UI", 9, "bold")).pack(side=LEFT, padx=(0,10))
 
-        self.schedule_time_ent = Entry(schedule_frame, width=15, font=("Segoe UI", 9))
-        self.schedule_time_ent.insert(0, "YYYY-MM-DD HH:MM")
-        self.schedule_time_ent.pack(side=LEFT, padx=5)
+        HoverButton(schedule_frame, text="📅 Set Date & Time", command=self.open_scheduler_config, bg="#E2E8F0", hover_color="#CBD5E1", fg=state.FG_TEXT, font=("Segoe UI", 9), relief="flat", cursor="hand2").pack(side=LEFT)
+
+        self.lbl_schedule_status = Label(schedule_frame, text="Not Scheduled", bg=state.BG_PANEL, fg="#64748B", font=("Segoe UI", 9))
+        self.lbl_schedule_status.pack(side=LEFT, padx=10)
+
+        self.schedule_config = None # Dictionary to hold datetime and repeat mode
 
         bottom_frame = Frame(self.root, bg=state.BG_APP)
         bottom_frame.pack(fill=X, side=BOTTOM, pady=10)
@@ -428,6 +431,70 @@ class ControlPanel:
     def update_queue_display(self):
         self.lbl_qcount.config(text=f"{len(state.TASK_QUEUE)} automated tasks queued")
 
+    def open_scheduler_config(self):
+        try:
+            from tkcalendar import Calendar
+        except ImportError:
+            show_alert(self.root, "Missing Dependency", "tkcalendar not installed. Run: pip install tkcalendar", "error")
+            return
+
+        sf = Toplevel(self.root)
+        sf.title("Schedule Execution Configurator")
+        sf.geometry("450x450")
+        sf.configure(bg=state.BG_PANEL)
+        sf.transient(self.root)
+        sf.grab_set()
+
+        Frame(sf, bg=state.BTN_GREEN, height=6).pack(fill=X, side=TOP)
+        Label(sf, text="📅 Select Date & Time", font=("Segoe UI", 12, "bold"), bg=state.BG_PANEL, fg=state.FG_TEXT).pack(pady=10)
+
+        cal = Calendar(sf, selectmode='day', date_pattern='y-mm-dd', showweeknumbers=False, cursor="hand2")
+        cal.pack(pady=10)
+
+        time_frame = Frame(sf, bg=state.BG_PANEL)
+        time_frame.pack(pady=5)
+
+        Label(time_frame, text="Time (24H):", bg=state.BG_PANEL, font=("Segoe UI", 10)).pack(side=LEFT, padx=5)
+        hr_var = StringVar(value="00")
+        ttk.Combobox(time_frame, textvariable=hr_var, values=[f"{i:02d}" for i in range(24)], width=3, state="readonly").pack(side=LEFT)
+        Label(time_frame, text=":", bg=state.BG_PANEL, font=("Segoe UI", 10, "bold")).pack(side=LEFT)
+        min_var = StringVar(value="00")
+        ttk.Combobox(time_frame, textvariable=min_var, values=[f"{i:02d}" for i in range(60)], width=3, state="readonly").pack(side=LEFT)
+
+        repeat_frame = Frame(sf, bg=state.BG_PANEL)
+        repeat_frame.pack(pady=10)
+        Label(repeat_frame, text="Repeat:", bg=state.BG_PANEL, font=("Segoe UI", 10)).pack(side=LEFT, padx=5)
+        repeat_var = StringVar(value="None")
+        ttk.Combobox(repeat_frame, textvariable=repeat_var, values=["None", "Hourly", "Daily", "Weekly"], state="readonly", width=12).pack(side=LEFT)
+
+        def commit_schedule():
+            date_str = cal.get_date()
+            time_str = f"{hr_var.get()}:{min_var.get()}"
+            from datetime import datetime
+            dt_str = f"{date_str} {time_str}"
+            try:
+                target_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+                if target_dt < datetime.now():
+                    show_alert(sf, "Invalid Time", "Target time is in the past!", "error")
+                    return
+
+                self.schedule_config = {
+                    "datetime": target_dt,
+                    "repeat": repeat_var.get()
+                }
+
+                status_text = f"Running: {target_dt.strftime('%Y-%m-%d %H:%M')}"
+                if repeat_var.get() != "None":
+                    status_text += f" (Repeats {repeat_var.get()})"
+
+                self.lbl_schedule_status.config(text=status_text, fg=state.BTN_GREEN)
+                self.schedule_var.set(True)
+                sf.destroy()
+            except Exception as e:
+                show_alert(sf, "Error", f"Failed to parse time: {e}", "error")
+
+        HoverButton(sf, text="Save Schedule", command=commit_schedule, bg=state.BTN_GREEN, hover_color=state.BTN_GREEN_HOVER, fg="white", font=("Segoe UI", 10, "bold"), relief="flat", width=20, cursor="hand2").pack(pady=15)
+
     def clear_queue_list(self):
         state.TASK_QUEUE.clear()
         self.update_queue_display()
@@ -667,23 +734,49 @@ class ControlPanel:
             return
 
         if self.schedule_var.get():
-            try:
-                from datetime import datetime
-                target_time = datetime.strptime(self.schedule_time_ent.get(), "%Y-%m-%d %H:%M")
+            if not self.schedule_config:
+                show_alert(self.root, "No Schedule", "Please click 'Set Date & Time' to configure the schedule.", "error")
+                return
 
-                def schedule_waiter():
-                    while datetime.now() < target_time:
-                        if state.GLOBAL_STOP:
-                            return
-                        time.sleep(1)
+            def schedule_waiter():
+                from datetime import datetime, timedelta
 
-                    print(f"\n[SCHEDULE] Target time reached. Executing queue...")
-                    execute_queue_automated(threads, self.root, self.progress, self.update_queue_display)
+                # Make a snapshot of the current queue to repeat later if needed
+                queue_snapshot = list(state.TASK_QUEUE)
 
-                threading.Thread(target=schedule_waiter, daemon=True).start()
-                show_alert(self.root, "Scheduled", f"Queue execution scheduled for {target_time.strftime('%Y-%m-%d %H:%M')}", "info")
-            except ValueError:
-                show_alert(self.root, "Invalid Time", "Please use the format YYYY-MM-DD HH:MM", "error")
+                while True:
+                    if state.GLOBAL_STOP:
+                        return
+
+                    target_time = self.schedule_config["datetime"]
+
+                    if datetime.now() >= target_time:
+                        print(f"\n[SCHEDULE] Target time {target_time} reached. Executing queue...")
+                        # Execute the queue snapshot
+                        state.TASK_QUEUE.clear()
+                        state.TASK_QUEUE.extend(queue_snapshot)
+                        execute_queue_automated(threads, self.root, self.progress, self.update_queue_display)
+
+                        repeat_mode = self.schedule_config.get("repeat", "None")
+                        if repeat_mode == "Hourly":
+                            self.schedule_config["datetime"] += timedelta(hours=1)
+                        elif repeat_mode == "Daily":
+                            self.schedule_config["datetime"] += timedelta(days=1)
+                        elif repeat_mode == "Weekly":
+                            self.schedule_config["datetime"] += timedelta(days=7)
+                        else:
+                            # Run once
+                            self.root.after(0, lambda: self.lbl_schedule_status.config(text="Finished", fg="#64748B"))
+                            self.root.after(0, lambda: self.schedule_var.set(False))
+                            break
+
+                        print(f"[SCHEDULE] Repeat mode {repeat_mode} active. Next run at: {self.schedule_config['datetime']}")
+                        self.root.after(0, lambda: self.lbl_schedule_status.config(text=f"Next Run: {self.schedule_config['datetime'].strftime('%Y-%m-%d %H:%M')}"))
+
+                    time.sleep(5)
+
+            threading.Thread(target=schedule_waiter, daemon=True).start()
+            show_alert(self.root, "Scheduled", f"Queue scheduled. Running at background.", "info")
         else:
             threading.Thread(target=execute_queue_automated, args=(threads, self.root, self.progress, self.update_queue_display), daemon=True).start()
 
@@ -1013,6 +1106,10 @@ class ControlPanel:
         self.meet_door = BooleanVar()
         Checkbutton(tab3, text="Door Pickup", variable=self.meet_door, bg=state.BG_PANEL, font=("Segoe UI", 10)).pack(anchor="w", padx=25)
 
+        Label(tab3, text="Execution Mode:", bg=state.BG_PANEL, fg=state.FG_TEXT, font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(20,0), padx=15)
+        self.direct_publish_var = BooleanVar()
+        Checkbutton(tab3, text="Publish Directly (Do Not Save as Draft)", variable=self.direct_publish_var, bg=state.BG_PANEL, font=("Segoe UI", 10, "bold"), fg=state.BTN_RED).pack(anchor="w", padx=25)
+
         Label(tab3, text="Templates Management:", bg=state.BG_PANEL, fg=state.FG_TEXT, font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(25,0), padx=15)
         templ_frame = Frame(tab3, bg=state.BG_PANEL)
         templ_frame.pack(fill=X, pady=5, padx=15)
@@ -1080,7 +1177,7 @@ class ControlPanel:
             "title": self.title_ent.get(), "price": self.price_ent.get(), "category": self.cat_var.get(), "condition": self.cond_var.get(),
             "avail": self.avail_var.get(), "desc": self.desc_ent.get("1.0", "end-1c"), "tags": self.tags_ent.get(), "loc_strat": self.loc_strategy.get(),
             "loc": self.loc_ent.get(), "loc_f": getattr(self, 'multi_listing_loc_file_path', ""), "meet_p": self.meet_pub.get(),
-            "door_p": self.meet_door.get(), "imgs": self.img_paths_list
+            "door_p": self.meet_door.get(), "imgs": self.img_paths_list, "direct_publish": self.direct_publish_var.get()
         }
         path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")], parent=self.form)
         if path:
@@ -1120,6 +1217,7 @@ class ControlPanel:
 
             self.meet_pub.set(details.get("meet_p", False))
             self.meet_door.set(details.get("door_p", False))
+            self.direct_publish_var.set(details.get("direct_publish", False))
 
             self.img_paths_list = details.get("imgs", [])
             self.refresh_image_panel()
@@ -1130,7 +1228,8 @@ class ControlPanel:
         details = {
             "title": self.title_ent.get(), "price": self.price_ent.get(), "category": self.cat_var.get(),
             "condition": self.cond_var.get(), "availability": self.avail_var.get(), "desc": self.desc_ent.get("1.0", "end-1c"),
-            "tags": self.tags_ent.get(), "public_meetup": self.meet_pub.get(), "door_pickup": self.meet_door.get(), "images": self.img_paths_list
+            "tags": self.tags_ent.get(), "public_meetup": self.meet_pub.get(), "door_pickup": self.meet_door.get(), "images": self.img_paths_list,
+            "direct_publish": self.direct_publish_var.get()
         }
 
         if title_strat == "manual":
