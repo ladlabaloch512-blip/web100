@@ -1113,6 +1113,11 @@ class ControlPanel:
         self.direct_publish_var = BooleanVar()
         Checkbutton(tab3, text="Publish Directly (Do Not Save as Draft)", variable=self.direct_publish_var, bg=state.BG_PANEL, font=("Segoe UI", 10, "bold"), fg=state.BTN_RED).pack(anchor="w", padx=25)
 
+        Label(tab3, text="Listing Engine:", bg=state.BG_PANEL, fg=state.FG_TEXT, font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(20,0), padx=15)
+        self.listing_engine_var = StringVar(value="normal")
+        Radiobutton(tab3, text="Normal UI Automation (Standard)", variable=self.listing_engine_var, value="normal", bg=state.BG_PANEL, font=("Segoe UI", 10)).pack(anchor="w", padx=25, pady=(5,0))
+        Radiobutton(tab3, text="Ultra Fast Injection (API Mode)", variable=self.listing_engine_var, value="api", bg=state.BG_PANEL, font=("Segoe UI", 10)).pack(anchor="w", padx=25)
+
         Label(tab3, text="Templates Management:", bg=state.BG_PANEL, fg=state.FG_TEXT, font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(25,0), padx=15)
         templ_frame = Frame(tab3, bg=state.BG_PANEL)
         templ_frame.pack(fill=X, pady=5, padx=15)
@@ -1180,7 +1185,8 @@ class ControlPanel:
             "title": self.title_ent.get(), "price": self.price_ent.get(), "category": self.cat_var.get(), "condition": self.cond_var.get(),
             "avail": self.avail_var.get(), "desc": self.desc_ent.get("1.0", "end-1c"), "tags": self.tags_ent.get(), "loc_strat": self.loc_strategy.get(),
             "loc": self.loc_ent.get(), "loc_f": getattr(self, 'multi_listing_loc_file_path', ""), "meet_p": self.meet_pub.get(),
-            "door_p": self.meet_door.get(), "imgs": self.img_paths_list, "direct_publish": self.direct_publish_var.get()
+            "door_p": self.meet_door.get(), "imgs": self.img_paths_list, "direct_publish": self.direct_publish_var.get(),
+            "engine": self.listing_engine_var.get()
         }
         path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")], parent=self.form)
         if path:
@@ -1221,6 +1227,7 @@ class ControlPanel:
             self.meet_pub.set(details.get("meet_p", False))
             self.meet_door.set(details.get("door_p", False))
             self.direct_publish_var.set(details.get("direct_publish", False))
+            self.listing_engine_var.set(details.get("engine", "normal"))
 
             self.img_paths_list = details.get("imgs", [])
             self.refresh_image_panel()
@@ -1232,7 +1239,8 @@ class ControlPanel:
             "title": self.title_ent.get(), "price": self.price_ent.get(), "category": self.cat_var.get(),
             "condition": self.cond_var.get(), "availability": self.avail_var.get(), "desc": self.desc_ent.get("1.0", "end-1c"),
             "tags": self.tags_ent.get(), "public_meetup": self.meet_pub.get(), "door_pickup": self.meet_door.get(), "images": self.img_paths_list,
-            "direct_publish": self.direct_publish_var.get()
+            "direct_publish": self.direct_publish_var.get(),
+            "engine": self.listing_engine_var.get()
         }
 
         if title_strat == "manual":
