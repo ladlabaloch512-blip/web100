@@ -123,20 +123,44 @@ def perform_listing(driver, details, p_name, state):
             js_click(driver, f'//span[text()="{details["category"]}"]', state)
             time.sleep(1)
 
-            wait_and_click(driver, "//label[@aria-label='Condition'] | //span[contains(text(), 'Condition')]/following::div[1]", state)
-            time.sleep(1.5)
-            js_click(driver, f'//span[text()="{details["condition"]}"]', state)
-            time.sleep(1)
+            try:
+                # Highly robust XPath for the Condition label/dropdown container (immune to random class names)
+                condition_label_xpath = "//label[contains(@aria-label, 'Condition')] | //span[text()='Condition' or text()='condition']/ancestor::label"
+                condition_btn = wait_and_find(driver, condition_label_xpath, state, timeout=10)
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", condition_btn)
+                time.sleep(0.5)
+                driver.execute_script("arguments[0].click();", condition_btn)
+                time.sleep(1.5)
+
+                # The dropdown menu opens at the end of the body in a portal, often with role="listbox" or role="menu"
+                # We look for the exact condition text globally, but prioritize elements with role="option"
+                target_condition = details["condition"]
+                condition_option_xpath = f"//div[@role='option']//span[text()='{target_condition}'] | //span[text()='{target_condition}']"
+                condition_opt = wait_and_find(driver, condition_option_xpath, state, timeout=5)
+                driver.execute_script("arguments[0].click();", condition_opt)
+                time.sleep(1)
+            except Exception as e:
+                print(f"[{p_name}] ⚠️ Failed to set Condition dropdown: {e}")
 
             try:
-                more_btn_xpath = "//span[contains(text(), 'More details') or contains(text(), 'More Details')] | //div[@role='button']//span[contains(text(), 'More details')]"
-                more_btn = wait_and_find(driver, more_btn_xpath, state, timeout=5)
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", more_btn)
-                time.sleep(1)
-                driver.execute_script("arguments[0].click();", more_btn)
-                time.sleep(2)
-            except:
-                pass
+                # Highly robust Javascript search for 'More details' or 'more details' ignoring case and nesting
+                js_more_btn = """
+                var spans = document.querySelectorAll('span');
+                for (var i = 0; i < spans.length; i++) {
+                    if (spans[i].innerText && spans[i].innerText.toLowerCase().includes('more details')) {
+                        return spans[i];
+                    }
+                }
+                return null;
+                """
+                more_btn = driver.execute_script(js_more_btn)
+                if more_btn:
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", more_btn)
+                    time.sleep(0.5)
+                    driver.execute_script("arguments[0].click();", more_btn)
+                    time.sleep(2)
+            except Exception as e:
+                print(f"[{p_name}] ⚠️ More details click failed/not found: {e}")
 
             try:
                 desc_box = wait_and_find(driver, "//label[@aria-label='Description']//textarea | //span[contains(text(), 'Description')]/following::textarea[1]", state, timeout=5)

@@ -16,6 +16,8 @@ def get_chrome_major_version():
     except:
         return None
 
+import psutil
+
 def force_kill_browser(driver, profile_name=None):
     try:
         pid = getattr(driver, "browser_pid", None)
@@ -23,8 +25,23 @@ def force_kill_browser(driver, profile_name=None):
             driver.quit()
         except:
             pass
+
         if pid:
-            subprocess.run(f"taskkill /F /PID {pid} /T", shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
+            try:
+                parent = psutil.Process(pid)
+                # Kill children first (tabs, renderers, extensions)
+                for child in parent.children(recursive=True):
+                    try:
+                        child.kill()
+                    except psutil.NoSuchProcess:
+                        pass
+                # Finally, kill parent driver
+                parent.kill()
+            except psutil.NoSuchProcess:
+                pass
+            except Exception as e:
+                # Fallback to precise taskkill using PID
+                subprocess.run(f"taskkill /F /PID {pid} /T", shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
     except:
         pass
 

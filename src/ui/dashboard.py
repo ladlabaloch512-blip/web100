@@ -506,16 +506,7 @@ class ControlPanel:
             force_kill_browser(driver)
         state.ACTIVE_DRIVERS.clear()
 
-        # Additional aggressive global sweep for safety
-        if sys.platform == "win32":
-            try:
-                import subprocess
-                subprocess.run('taskkill /F /IM chrome.exe /T', shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                subprocess.run('taskkill /F /IM chromedriver.exe /T', shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
-            except:
-                pass
-
-        show_alert(self.root, "Stopped", "Automation halted forcefully. Ghost processes killed.", "error")
+        show_alert(self.root, "Stopped", "Automation halted forcefully. Running profile processes killed successfully.", "error")
 
     def refresh_profiles(self):
         for widget in self.scrollable_frame.winfo_children():
