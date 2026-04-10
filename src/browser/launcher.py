@@ -45,6 +45,9 @@ def launch_browser(profile_name, base_path, state_module):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
+    if getattr(state_module, "HEADLESS_MODE", False):
+        options.add_argument("--headless=new")
+
     with driver_setup_lock:
         if download_needed:
             print(f"[SYSTEM] Fetching ChromeDriver v{chrome_version}...")

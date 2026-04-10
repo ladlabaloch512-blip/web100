@@ -69,6 +69,12 @@ class ControlPanel:
         HoverButton(bulk_auto_frame, text="🚶‍♂️ Queued Human Activity", hover_color="#a855f7", command=self.prepare_human_activity_queued, bg="#c084fc", fg="white", font=("Segoe UI", 10, "bold"), relief="flat", height=2, cursor="hand2").pack(fill=X, padx=20, pady=6)
 
         HoverButton(bulk_auto_frame, text="📬 LIVE MESSAGES HUB", hover_color="#4F46E5", command=self.open_messenger_hub, bg="#4338CA", fg="white", font=("Segoe UI", 10, "bold"), relief="flat", height=2, cursor="hand2").pack(fill=X, padx=20, pady=(6,0))
+
+        self.headless_var = BooleanVar(value=state.HEADLESS_MODE)
+        def toggle_headless():
+            state.HEADLESS_MODE = self.headless_var.get()
+        Checkbutton(bulk_auto_frame, text="Run in Headless Mode (Invisible)", variable=self.headless_var, command=toggle_headless, bg=state.BG_PANEL, fg=state.BTN_RED, font=("Segoe UI", 9, "bold")).pack(pady=(10, 0))
+
         Label(bulk_auto_frame, text="", bg=state.BG_PANEL).pack()
 
         mgt_frame = Frame(left_pane, bg=state.BG_PANEL, bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)
