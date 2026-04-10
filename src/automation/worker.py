@@ -25,7 +25,8 @@ def worker_task(p_name, task_type, details=None, email=None, pwd=None, progress_
         elif task_type == "messenger_reply":
             send_messenger_reply(driver, p_name, state, details)
         elif task_type == "human_activity":
-            res = perform_human_activity(driver, p_name, state)
+            duration = details.get("duration_minutes", 1) if details else 1
+            res = perform_human_activity(driver, p_name, state, duration)
             if res:
                 state.update_status(p_name, "✅ Warmed Up")
         elif task_type == "manual":

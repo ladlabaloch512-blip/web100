@@ -368,8 +368,12 @@ from selenium.webdriver.support import expected_conditions as EC
 from src.automation.selenium_utils import wait_for_page_load
 import src.state as state
 
-def perform_human_activity(driver, p_name, state_module):
-    print(f"🚶‍♂️ [{p_name}] Starting Human Activity (Warm-up) process...")
+def perform_human_activity(driver, p_name, state_module, duration_minutes=1):
+    print(f"🚶‍♂️ [{p_name}] Starting Human Activity (Warm-up) process for {duration_minutes} minutes...")
+
+    start_time = time.time()
+    end_time = start_time + (duration_minutes * 60)
+
     try:
         driver.get("https://web.facebook.com")
         wait_for_page_load(driver, state_module)
@@ -382,37 +386,134 @@ def perform_human_activity(driver, p_name, state_module):
             return False
 
         print(f"[{p_name}] Browsing feed...")
-        scroll_count = random.randint(10, 25)
+        scroll_count = 0
         likes_done = 0
-        target_likes = random.randint(1, 4)
+        comments_done = 0
+        page_visits = 0
 
-        for i in range(scroll_count):
+        while time.time() < end_time:
             if state_module.GLOBAL_STOP:
                 return False
 
-            # Scroll down randomly
-            scroll_amt = random.randint(300, 900)
-            driver.execute_script(f"window.scrollBy(0, {scroll_amt});")
+            activity_choice = random.choices(
+                ["scroll_feed", "visit_group", "visit_page", "watch_video"],
+                weights=[0.6, 0.2, 0.1, 0.1]
+            )[0]
 
-            # Pause to "read"
-            time.sleep(random.uniform(1.5, 4.5))
+            if activity_choice == "scroll_feed":
+                # Scroll down randomly
+                scroll_amt = random.randint(300, 900)
+                driver.execute_script(f"window.scrollBy(0, {scroll_amt});")
+                scroll_count += 1
 
-            # Occasional Like
-            if likes_done < target_likes and random.random() < 0.15:
+                # Pause to "read"
+                time.sleep(random.uniform(2.0, 6.0))
+
+                # Occasional Like
+                if random.random() < 0.1:
+                    try:
+                        like_btns = driver.find_elements(By.XPATH, "//div[@aria-label='Like' and @role='button']")
+                        if like_btns:
+                            target = random.choice(like_btns)
+                            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target)
+                            time.sleep(random.uniform(0.5, 1.5))
+                            driver.execute_script("arguments[0].click();", target)
+                            likes_done += 1
+                            print(f"👍 [{p_name}] Liked a post!")
+                            time.sleep(random.uniform(2.0, 4.0))
+                    except Exception:
+                        pass
+
+                # Occasional comment (very rare)
+                if random.random() < 0.02:
+                    try:
+                        comment_btns = driver.find_elements(By.XPATH, "//div[@aria-label='Comment' and @role='button'] | //div[@aria-label='Leave a comment' and @role='button']")
+                        if comment_btns:
+                            target = random.choice(comment_btns)
+                            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target)
+                            time.sleep(random.uniform(1.0, 2.0))
+                            driver.execute_script("arguments[0].click();", target)
+                            time.sleep(random.uniform(2.0, 4.0))
+
+                            comment_box = driver.find_element(By.XPATH, "//div[@role='textbox' and @aria-label='Write a comment…']")
+                            comments = ["Nice!", "Great!", "Awesome!", "Wow", "Interesting", "Cool!"]
+                            human_type(comment_box, random.choice(comments), False, state_module)
+                            time.sleep(random.uniform(0.5, 1.5))
+                            comment_box.send_keys(Keys.ENTER)
+                            comments_done += 1
+                            print(f"💬 [{p_name}] Commented on a post!")
+                            time.sleep(random.uniform(3.0, 5.0))
+                    except Exception:
+                        pass
+
+            elif activity_choice == "visit_group":
+                print(f"👥 [{p_name}] Visiting Groups...")
                 try:
-                    like_btns = driver.find_elements(By.XPATH, "//div[@aria-label='Like' and @role='button']")
-                    if like_btns:
-                        target = random.choice(like_btns)
-                        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target)
-                        time.sleep(random.uniform(0.5, 1.5))
-                        driver.execute_script("arguments[0].click();", target)
-                        likes_done += 1
-                        print(f"👍 [{p_name}] Liked a post! ({likes_done}/{target_likes})")
-                        time.sleep(random.uniform(1.0, 3.0))
-                except Exception as e:
+                    driver.get("https://web.facebook.com/groups/feed/")
+                    wait_for_page_load(driver, state_module)
+                    time.sleep(random.uniform(3.0, 7.0))
+
+                    for _ in range(random.randint(3, 8)):
+                        if state_module.GLOBAL_STOP or time.time() >= end_time:
+                            break
+                        driver.execute_script(f"window.scrollBy(0, {random.randint(400, 800)});")
+                        time.sleep(random.uniform(2.0, 5.0))
+                        scroll_count += 1
+
+                    driver.get("https://web.facebook.com") # return to feed
+                    time.sleep(random.uniform(2.0, 4.0))
+                except Exception:
                     pass
 
-        print(f"✅ [{p_name}] Human Activity complete. Scrolled {scroll_count} times, liked {likes_done} posts.")
+            elif activity_choice == "watch_video":
+                print(f"📺 [{p_name}] Watching Videos...")
+                try:
+                    driver.get("https://web.facebook.com/watch")
+                    wait_for_page_load(driver, state_module)
+                    time.sleep(random.uniform(15.0, 45.0)) # Watch for a while
+
+                    for _ in range(random.randint(2, 5)):
+                        if state_module.GLOBAL_STOP or time.time() >= end_time:
+                            break
+                        driver.execute_script(f"window.scrollBy(0, {random.randint(500, 900)});")
+                        time.sleep(random.uniform(10.0, 25.0))
+                        scroll_count += 1
+
+                    driver.get("https://web.facebook.com") # return to feed
+                    time.sleep(random.uniform(2.0, 4.0))
+                except Exception:
+                    pass
+
+            elif activity_choice == "visit_page":
+                print(f"📄 [{p_name}] Exploring random pages/profiles...")
+                page_visits += 1
+                try:
+                    # Click on a random link in the feed (like a profile or page name)
+                    links = driver.find_elements(By.XPATH, "//a[@role='link' and contains(@href, 'facebook.com')]")
+                    valid_links = [l for l in links if l.is_displayed() and l.text.strip() != ""]
+
+                    if valid_links:
+                        target = random.choice(valid_links[:10]) # Pick from top visible links
+                        driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target)
+                        time.sleep(random.uniform(1.0, 2.0))
+                        driver.execute_script("arguments[0].click();", target)
+
+                        wait_for_page_load(driver, state_module)
+                        time.sleep(random.uniform(4.0, 8.0))
+
+                        for _ in range(random.randint(2, 4)):
+                            if state_module.GLOBAL_STOP or time.time() >= end_time:
+                                break
+                            driver.execute_script(f"window.scrollBy(0, {random.randint(300, 700)});")
+                            time.sleep(random.uniform(2.0, 5.0))
+                            scroll_count += 1
+
+                        driver.get("https://web.facebook.com") # return to feed
+                        time.sleep(random.uniform(2.0, 4.0))
+                except Exception:
+                    pass
+
+        print(f"✅ [{p_name}] Human Activity complete. Duration: {duration_minutes} min, Scrolled: {scroll_count}, Liked: {likes_done}, Commented: {comments_done}, Pages visited: {page_visits}.")
         return True
 
     except Exception as e:

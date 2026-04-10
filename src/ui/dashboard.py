@@ -748,7 +748,12 @@ class ControlPanel:
         selected = self.get_selected_profiles()
         if not selected:
             return
-        self.add_automated_to_queue(selected, "human_activity")
+
+        minutes = simpledialog.askinteger("Human Activity", "Enter duration per profile (in minutes):", minvalue=1, maxvalue=60, parent=self.root)
+        if not minutes:
+            return
+
+        self.add_automated_to_queue(selected, "human_activity", {"duration_minutes": minutes})
 
     def prepare_publish_drafts_queued(self):
         selected = self.get_selected_profiles()
