@@ -52,8 +52,31 @@ class ControlPanel:
         main_layout.pack(fill=BOTH, expand=True, padx=25, pady=(15,0))
 
         # --- LEFT PANE ---
-        left_pane = Frame(main_layout, bg=state.BG_APP, width=320)
-        left_pane.pack(side=LEFT, fill=Y, padx=(0, 20))
+        left_pane_canvas = Canvas(main_layout, bg=state.BG_APP, width=320, highlightthickness=0)
+        left_scrollbar = Scrollbar(main_layout, orient="vertical", command=left_pane_canvas.yview)
+        left_pane = Frame(left_pane_canvas, bg=state.BG_APP)
+        left_pane.bind("<Configure>", lambda e: left_pane_canvas.configure(scrollregion=left_pane_canvas.bbox("all")))
+        left_window = left_pane_canvas.create_window((0, 0), window=left_pane, anchor="nw", width=300)
+        left_pane_canvas.configure(yscrollcommand=left_scrollbar.set)
+
+        def _on_mousewheel_left(event):
+            if hasattr(event, "delta") and event.delta:
+                left_pane_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            elif hasattr(event, "num"):
+                if event.num == 4:
+                    left_pane_canvas.yview_scroll(-1, "units")
+                elif event.num == 5:
+                    left_pane_canvas.yview_scroll(1, "units")
+
+        left_pane_canvas.bind("<MouseWheel>", _on_mousewheel_left)
+        left_pane_canvas.bind("<Button-4>", _on_mousewheel_left)
+        left_pane_canvas.bind("<Button-5>", _on_mousewheel_left)
+        left_pane.bind("<MouseWheel>", _on_mousewheel_left)
+        left_pane.bind("<Button-4>", _on_mousewheel_left)
+        left_pane.bind("<Button-5>", _on_mousewheel_left)
+
+        left_pane_canvas.pack(side=LEFT, fill=Y, padx=(0, 0))
+        left_scrollbar.pack(side=LEFT, fill=Y, padx=(0, 20))
 
         bulk_auto_frame = Frame(left_pane, bg=state.BG_PANEL, bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)
         bulk_auto_frame.pack(fill=X, pady=(0, 20))

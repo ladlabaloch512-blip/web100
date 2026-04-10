@@ -4,17 +4,26 @@ import json
 import random
 import hashlib
 import subprocess
-import winreg
-import winsound
+try:
+    import winreg
+except ImportError:
+    winreg = None
+try:
+    import winsound
+except ImportError:
+    winsound = None
 import time
 
 def get_chrome_major_version():
+    if winreg is None:
+        # Fallback for non-Windows (or just return 130 as default since patcher handles it)
+        return 130
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Google\Chrome\BLBeacon")
         version, _ = winreg.QueryValueEx(key, "version")
         return int(version.split('.')[0])
     except:
-        return None
+        return 130
 
 import psutil
 
@@ -108,6 +117,9 @@ def check_login_status(profile_name, base_path):
 
 def play_success_sound():
     try:
-        winsound.MessageBeep(winsound.MB_ICONASTERISK)
+        if winsound:
+            winsound.MessageBeep(winsound.MB_ICONASTERISK)
+        else:
+            print("\a") # fallback system beep
     except:
         pass

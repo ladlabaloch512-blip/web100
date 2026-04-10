@@ -78,6 +78,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from src.automation.selenium_utils import human_type, wait_for_page_load, wait_and_find, wait_and_click, js_click
 import src.db_manager.database as db
+from PIL import Image
+import os
+import uuid
+import tempfile
 
 def perform_listing(driver, details, p_name, state):
     print(f"🛒 [{p_name}] Starting UI-based listing process...")
