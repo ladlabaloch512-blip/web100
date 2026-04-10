@@ -69,7 +69,7 @@ def perform_login(driver, email, password, p_name, state):
             print(f"❌ [{p_name}] Failed to load Facebook login page.")
             return False
 
-import src.state.database as db
+import src.db_manager.database as db
 
 def perform_listing(driver, details, p_name, state):
     print(f"🛒 [{p_name}] Starting API listing process...")

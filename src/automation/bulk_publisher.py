@@ -4,7 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from src.automation.selenium_utils import wait_for_page_load
-import src.state.database as db
+import src.db_manager.database as db
 import src.state as state
 
 def publish_drafts(driver, p_name, tabs_count):
