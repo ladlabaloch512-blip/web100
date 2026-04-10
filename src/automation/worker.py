@@ -48,14 +48,31 @@ def worker_task(p_name, task_type, details=None, email=None, pwd=None, progress_
             except:
                 body_text = ""
 
+            # Actively search for DOM elements indicating state
+            try:
+                login_form = driver.find_elements(By.NAME, "email")
+            except:
+                login_form = []
+
+            try:
+                nav_bar = driver.find_elements(By.XPATH, "//div[@role='navigation']")
+            except:
+                nav_bar = []
+
             if "suspended" in body_text or "disabled" in current_url:
                 state.app_config[f"status_{p_name}"] = "🔴 Disabled"
             elif "checkpoint" in current_url or "two_step" in current_url or "challenge" in current_url:
                 state.app_config[f"status_{p_name}"] = "🟡 Checkpoint"
-            elif "login" in current_url or "incorrect" in body_text:
+            elif login_form or "login" in current_url or "incorrect" in body_text:
                 state.app_config[f"status_{p_name}"] = "⚪ Logged Out"
-            else:
+            elif nav_bar:
                 state.app_config[f"status_{p_name}"] = "🟢 Ready"
+            else:
+                # If we're neither explicitly logged out nor explicitly showing a nav bar, check for generic error/checkpoint
+                if "we're reviewing" in body_text or "account restricted" in body_text:
+                    state.app_config[f"status_{p_name}"] = "🔴 Disabled"
+                else:
+                    state.app_config[f"status_{p_name}"] = "⚪ Logged Out" # Default fail-safe
 
             state.save_config(state.app_config)
 
