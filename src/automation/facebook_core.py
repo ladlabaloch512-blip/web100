@@ -115,29 +115,82 @@ def perform_listing(driver, details, p_name, state):
             wait_and_find(driver, "//input[@type='file']", state).send_keys("\n".join(current_images))
             time.sleep(5)
 
-            human_type(wait_and_find(driver, "//label[@aria-label='Title']//input | //span[contains(text(), 'Title')]/following::input[1]", state), current_title, False, state)
-            human_type(wait_and_find(driver, "//label[@aria-label='Price']//input | //span[contains(text(), 'Price')]/following::input[1]", state), details['price'], False, state)
-
-            wait_and_click(driver, "//label[@aria-label='Category'] | //span[contains(text(), 'Category')]/following::div[1]", state)
-            time.sleep(1.5)
-            js_click(driver, f'//span[text()="{details["category"]}"]', state)
-            time.sleep(1)
+            try:
+                # Highly robust Javascript fallback for Title
+                title_box = wait_and_find(driver, "//label[@aria-label='Title']//input | //span[text()='Title']/ancestor::label//input | //span[contains(text(), 'Title')]/following::input[1]", state, timeout=15)
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", title_box)
+                time.sleep(0.5)
+                driver.execute_script("arguments[0].click();", title_box)
+                human_type(title_box, current_title, False, state)
+            except Exception as e:
+                print(f"[{p_name}] ⚠️ Fallback injecting Title... ({e})")
+                driver.execute_script("""
+                var el = document.evaluate("//label[@aria-label='Title']//input | //span[text()='Title']/ancestor::label//input | //span[contains(text(), 'Title')]/following::input[1]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                if(el) { el.value = arguments[0]; el.dispatchEvent(new Event('input', { bubbles: true })); }
+                """, current_title)
 
             try:
-                # Highly robust XPath for the Condition label/dropdown container (immune to random class names)
-                condition_label_xpath = "//label[contains(@aria-label, 'Condition')] | //span[text()='Condition' or text()='condition']/ancestor::label"
-                condition_btn = wait_and_find(driver, condition_label_xpath, state, timeout=10)
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", condition_btn)
+                # Highly robust Javascript fallback for Price
+                price_box = wait_and_find(driver, "//label[@aria-label='Price']//input | //span[text()='Price']/ancestor::label//input | //span[contains(text(), 'Price')]/following::input[1]", state, timeout=15)
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", price_box)
                 time.sleep(0.5)
-                driver.execute_script("arguments[0].click();", condition_btn)
+                driver.execute_script("arguments[0].click();", price_box)
+                human_type(price_box, details['price'], False, state)
+            except Exception as e:
+                print(f"[{p_name}] ⚠️ Fallback injecting Price... ({e})")
+                driver.execute_script("""
+                var el = document.evaluate("//label[@aria-label='Price']//input | //span[text()='Price']/ancestor::label//input | //span[contains(text(), 'Price')]/following::input[1]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                if(el) { el.value = arguments[0]; el.dispatchEvent(new Event('input', { bubbles: true })); }
+                """, details['price'])
+
+            try:
+                wait_and_click(driver, "//label[@aria-label='Category'] | //span[text()='Category']/ancestor::label | //span[contains(text(), 'Category')]/following::div[1]", state, timeout=10)
+                time.sleep(1.5)
+                js_click(driver, f'//span[text()="{details["category"]}"]', state)
+                time.sleep(1)
+            except Exception as e:
+                print(f"[{p_name}] ⚠️ Fallback Category dropdown: {e}")
+
+            try:
+                # Pure Javascript automation to find and click the Condition combobox
+                js_open_condition = """
+                var spans = document.querySelectorAll('span');
+                for (var i = 0; i < spans.length; i++) {
+                    if (spans[i].innerText && spans[i].innerText.toLowerCase() === 'condition') {
+                        var combobox = spans[i].closest('label').querySelector('div[role="combobox"]');
+                        if (combobox) {
+                            combobox.scrollIntoView({block: 'center'});
+                            combobox.click();
+                            return true;
+                        }
+                    }
+                }
+                return false;
+                """
+                success = driver.execute_script(js_open_condition)
+                if not success:
+                    raise Exception("Could not find condition combobox via JS")
                 time.sleep(1.5)
 
-                # The dropdown menu opens at the end of the body in a portal, often with role="listbox" or role="menu"
-                # We look for the exact condition text globally, but prioritize elements with role="option"
+                # The dropdown menu opens at the end of the body in a portal
                 target_condition = details["condition"]
-                condition_option_xpath = f"//div[@role='option']//span[text()='{target_condition}'] | //span[text()='{target_condition}']"
-                condition_opt = wait_and_find(driver, condition_option_xpath, state, timeout=5)
-                driver.execute_script("arguments[0].click();", condition_opt)
+                js_select_condition = f"""
+                var options = document.querySelectorAll('div[role="option"] span');
+                for (var i = 0; i < options.length; i++) {{
+                    if (options[i].innerText === '{target_condition}') {{
+                        options[i].click();
+                        return true;
+                    }}
+                }}
+                return false;
+                """
+                success = driver.execute_script(js_select_condition)
+                if not success:
+                    print(f"[{p_name}] ⚠️ Could not find exact condition text '{target_condition}', trying XPath...")
+                    condition_option_xpath = f"//div[@role='option']//span[text()='{target_condition}'] | //span[text()='{target_condition}']"
+                    condition_opt = wait_and_find(driver, condition_option_xpath, state, timeout=5)
+                    driver.execute_script("arguments[0].click();", condition_opt)
+
                 time.sleep(1)
             except Exception as e:
                 print(f"[{p_name}] ⚠️ Failed to set Condition dropdown: {e}")
