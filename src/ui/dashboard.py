@@ -98,11 +98,24 @@ class ControlPanel:
             state.HEADLESS_MODE = self.headless_var.get()
         Checkbutton(bulk_auto_frame, text="Run in Headless Mode (Invisible)", variable=self.headless_var, command=toggle_headless, bg=state.BG_PANEL, fg=state.BTN_RED, font=("Segoe UI", 9, "bold")).pack(pady=(10, 0))
 
-        self.disable_images_var = BooleanVar(value=state.DISABLE_IMAGES)
-        def toggle_disable_images():
-            state.DISABLE_IMAGES = self.disable_images_var.get()
-        Checkbutton(bulk_auto_frame, text="Block Images (Fast Process)", variable=self.disable_images_var, command=toggle_disable_images, bg=state.BG_PANEL, fg=state.BTN_ORANGE, font=("Segoe UI", 9, "bold")).pack(pady=(0, 0))
+        Label(bulk_auto_frame, text="Image Loading (Speed up):", font=("Segoe UI", 9, "bold"), fg=state.FG_TEXT, bg=state.BG_PANEL).pack(pady=(10, 5))
+        img_btn_frame = Frame(bulk_auto_frame, bg=state.BG_PANEL)
+        img_btn_frame.pack(fill=X, padx=10)
 
+        self.lbl_img_status = Label(bulk_auto_frame, text="Status: Images Enabled", font=("Segoe UI", 8), fg=state.BTN_GREEN, bg=state.BG_PANEL)
+
+        def set_images_enabled():
+            state.DISABLE_IMAGES = False
+            self.lbl_img_status.config(text="Status: Images Enabled", fg=state.BTN_GREEN)
+
+        def set_images_disabled():
+            state.DISABLE_IMAGES = True
+            self.lbl_img_status.config(text="Status: Images Blocked", fg=state.BTN_RED)
+
+        HoverButton(img_btn_frame, text="Enable Images", command=set_images_enabled, bg=state.BTN_GREEN, hover_color=state.BTN_GREEN_HOVER, fg="white", font=("Segoe UI", 9, "bold"), relief="flat", cursor="hand2").pack(side=LEFT, expand=True, fill=X, padx=2)
+        HoverButton(img_btn_frame, text="Disable Images", command=set_images_disabled, bg=state.BTN_RED, hover_color=state.BTN_RED_HOVER, fg="white", font=("Segoe UI", 9, "bold"), relief="flat", cursor="hand2").pack(side=RIGHT, expand=True, fill=X, padx=2)
+
+        self.lbl_img_status.pack(pady=(5, 0))
         Label(bulk_auto_frame, text="", bg=state.BG_PANEL).pack()
 
         mgt_frame = Frame(left_pane, bg=state.BG_PANEL, bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)

@@ -56,11 +56,12 @@ def force_kill_browser(driver, profile_name=None):
 
     if profile_name and sys.platform == "win32":
         try:
-            # Aggressively kill any lingering chrome or chromedriver processes that are tied to this profile's command line arguments
-            wmic_cmd = f'wmic process where "name=\'chrome.exe\' and commandline like \'%{profile_name}%\'" call terminate'
+            # Aggressively kill any lingering chrome or chromedriver processes that are tied to this profile's command line arguments.
+            # Using exact path match for the profile dir to prevent 'Profile 1' matching 'Profile 10'
+            wmic_cmd = f'wmic process where "name=\'chrome.exe\' and commandline like \'%\\\\{profile_name}\"%\'" call terminate'
             subprocess.run(wmic_cmd, shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
 
-            wmic_driver_cmd = f'wmic process where "name=\'chromedriver.exe\' and commandline like \'%{profile_name}%\'" call terminate'
+            wmic_driver_cmd = f'wmic process where "name=\'chromedriver.exe\' and commandline like \'%\\\\{profile_name}\"%\'" call terminate'
             subprocess.run(wmic_driver_cmd, shell=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
         except:
             pass

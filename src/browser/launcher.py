@@ -54,7 +54,12 @@ def launch_browser(profile_name, base_path, state_module):
             "profile.managed_default_content_settings.images": 2,
             "profile.managed_default_content_settings.stylesheets": 2
         }
-        options.add_experimental_option("prefs", prefs)
+    else:
+        prefs = {
+            "profile.managed_default_content_settings.images": 1,
+            "profile.managed_default_content_settings.stylesheets": 1
+        }
+    options.add_experimental_option("prefs", prefs)
 
     # Zero-storage and crashpad optimizations
     options.add_argument("--disk-cache-size=1")

@@ -116,7 +116,7 @@ class MarketplaceLister:
                             listing_id = f"DRAFT_{int(time.time())}"
 
                         draft_url = f"https://web.facebook.com/marketplace/item/{listing_id}"
-                        db.insert_draft(profile_dir, listing_id, draft_url, current_title, "Drafted (API)")
+                        db.insert_draft(profile_dir, listing_id, draft_url, current_title, "Drafted")
                         print(f"✅ [{profile_dir}] Draft URL saved to DB: {draft_url}")
                     except Exception as e:
                         print(f"⚠️ [{profile_dir}] Could not save draft to DB: {e}")
