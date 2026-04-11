@@ -29,7 +29,8 @@ except ImportError:
     print("[ERROR] Missing required library: requests. Please open CMD and run: pip install requests")
     sys.exit(1)
 
-from src.ui.dashboard import ControlPanel
+import flet as ft
+from src.ui.flet_dashboard import main as flet_main
 from src.licensing import verify_license, show_activation_screen
 
 if __name__ == "__main__":
@@ -40,5 +41,4 @@ if __name__ == "__main__":
         if not is_valid:
             sys.exit(0)
 
-    app = ControlPanel()
-    app.root.mainloop()
+    ft.app(target=flet_main)
