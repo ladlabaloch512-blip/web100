@@ -3,3 +3,4 @@ undetected-chromedriver
 psutil
 requests
 pillow
+flet
