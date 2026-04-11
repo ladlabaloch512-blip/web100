@@ -98,6 +98,11 @@ class ControlPanel:
             state.HEADLESS_MODE = self.headless_var.get()
         Checkbutton(bulk_auto_frame, text="Run in Headless Mode (Invisible)", variable=self.headless_var, command=toggle_headless, bg=state.BG_PANEL, fg=state.BTN_RED, font=("Segoe UI", 9, "bold")).pack(pady=(10, 0))
 
+        self.disable_images_var = BooleanVar(value=state.DISABLE_IMAGES)
+        def toggle_disable_images():
+            state.DISABLE_IMAGES = self.disable_images_var.get()
+        Checkbutton(bulk_auto_frame, text="Block Images (Fast Process)", variable=self.disable_images_var, command=toggle_disable_images, bg=state.BG_PANEL, fg=state.BTN_ORANGE, font=("Segoe UI", 9, "bold")).pack(pady=(0, 0))
+
         Label(bulk_auto_frame, text="", bg=state.BG_PANEL).pack()
 
         mgt_frame = Frame(left_pane, bg=state.BG_PANEL, bd=1, relief="solid", highlightbackground=state.BORDER_COLOR, highlightthickness=1)
@@ -207,6 +212,10 @@ class ControlPanel:
 
         bottom_frame = Frame(self.root, bg=state.BG_APP)
         bottom_frame.pack(fill=X, side=BOTTOM, pady=10)
+
+        self.lbl_global_status = Label(bottom_frame, text="Idle", font=("Segoe UI", 10, "bold"), fg=state.FG_TEXT, bg=state.BG_APP)
+        self.lbl_global_status.pack(fill=X, padx=25, pady=(0, 5))
+
         self.progress = ttk.Progressbar(bottom_frame, orient="horizontal", mode="determinate")
         self.progress.pack(fill=X, padx=25)
 
@@ -797,7 +806,7 @@ class ControlPanel:
                         # Execute the queue snapshot
                         state.TASK_QUEUE.clear()
                         state.TASK_QUEUE.extend(queue_snapshot)
-                        execute_queue_automated(threads, self.root, self.progress, self.update_queue_display)
+                        execute_queue_automated(threads, self.root, self.progress, self.update_queue_display, self.lbl_global_status)
 
                         repeat_mode = self.schedule_config.get("repeat", "None")
                         if repeat_mode == "Hourly":
@@ -820,7 +829,7 @@ class ControlPanel:
             threading.Thread(target=schedule_waiter, daemon=True).start()
             show_alert(self.root, "Scheduled", f"Queue scheduled. Running at background.", "info")
         else:
-            threading.Thread(target=execute_queue_automated, args=(threads, self.root, self.progress, self.update_queue_display), daemon=True).start()
+            threading.Thread(target=execute_queue_automated, args=(threads, self.root, self.progress, self.update_queue_display, self.lbl_global_status), daemon=True).start()
 
     def bulk_create(self):
         count = simpledialog.askinteger("Create Profiles", "How many new profiles to provision?", minvalue=1, parent=self.root)
@@ -893,15 +902,7 @@ class ControlPanel:
         if not selected:
             return
 
-        threads = self.ask_thread_count(len(selected))
-        if not threads:
-            return
-
         self.add_automated_to_queue(selected, "health_check")
-
-        # We start the master queue automatically for health checks
-        if state.TASK_QUEUE:
-            threading.Thread(target=execute_queue_automated, args=(threads, self.root, self.progress, self.refresh_profiles), daemon=True).start()
 
     def bulk_clear_cache(self):
         selected = self.get_selected_profiles()
@@ -1075,9 +1076,21 @@ class ControlPanel:
         self.cond_var.set(state.CONDITIONS[0])
         ttk.Combobox(tab2, textvariable=self.cond_var, values=state.CONDITIONS, state="readonly", width=58).pack(padx=15, pady=5)
 
-        Label(tab2, text="Listing Description:", bg=state.BG_PANEL, fg=state.FG_TEXT, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=15, pady=(10,0))
+        Label(tab2, text="Listing Description Strategy:", bg=state.BG_PANEL, fg=state.FG_TEXT, font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(15,0), padx=15)
+
+        self.desc_strategy = StringVar(value="manual")
+        Radiobutton(tab2, text="Manual Single Description:", variable=self.desc_strategy, value="manual", bg=state.BG_PANEL, font=("Segoe UI", 10)).pack(anchor="w", padx=25, pady=(5,0))
         self.desc_ent = Text(tab2, width=54, height=7, font=("Segoe UI", 10), bd=1, relief="solid", highlightcolor=state.BORDER_COLOR)
-        self.desc_ent.pack(padx=15, pady=5)
+        self.desc_ent.pack(padx=25, pady=5)
+
+        Radiobutton(tab2, text="Auto-Randomize Descriptions from list (.txt) [Comma separated in file]:", variable=self.desc_strategy, value="list", bg=state.BG_PANEL, font=("Segoe UI", 10)).pack(anchor="w", padx=25, pady=(10,0))
+
+        list_desc_frame = Frame(tab2, bg=state.BG_PANEL)
+        list_desc_frame.pack(fill=X, padx=25)
+        HoverButton(list_desc_frame, text="Browse Descriptions File (.txt)", hover_color="#CBD5E1", command=self.pick_multi_listing_desc_file, bg="#E2E8F0", fg=state.FG_TEXT, font=("Segoe UI", 9), relief="solid", bd=1, padx=10, cursor="hand2").pack(side=LEFT, pady=5)
+
+        self.lbl_desc_file_status = Label(list_desc_frame, text="Status: Manual Strategy Enabled", bg=state.BG_PANEL, fg=state.BTN_BLUE, font=("Segoe UI", 9))
+        self.lbl_desc_file_status.pack(side=LEFT, padx=10)
 
         Label(tab2, text="Search Tags (Comma separated):", bg=state.BG_PANEL, fg=state.FG_TEXT, font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=15, pady=(10,0))
         self.tags_ent = Entry(tab2, width=60, font=("Segoe UI", 10))
@@ -1140,6 +1153,13 @@ class ControlPanel:
             self.lbl_title_file_status.config(text=f"List Loaded: {os.path.basename(path)}")
             self.title_strategy.set("list")
 
+    def pick_multi_listing_desc_file(self):
+        path = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")], parent=self.form)
+        if path:
+            self.multi_listing_desc_file_path = path
+            self.lbl_desc_file_status.config(text=f"List Loaded: {os.path.basename(path)}")
+            self.desc_strategy.set("list")
+
     def pick_multi_images(self):
         paths = filedialog.askopenfilenames(parent=self.form)
         if paths:
@@ -1186,7 +1206,12 @@ class ControlPanel:
             "avail": self.avail_var.get(), "desc": self.desc_ent.get("1.0", "end-1c"), "tags": self.tags_ent.get(), "loc_strat": self.loc_strategy.get(),
             "loc": self.loc_ent.get(), "loc_f": getattr(self, 'multi_listing_loc_file_path', ""), "meet_p": self.meet_pub.get(),
             "door_p": self.meet_door.get(), "imgs": self.img_paths_list, "direct_publish": self.direct_publish_var.get(),
-            "engine": self.listing_engine_var.get()
+            "engine": self.listing_engine_var.get(),
+            "title_strat": self.title_strategy.get(),
+            "title_f": getattr(self, 'multi_listing_title_file_path', ""),
+            "desc_strat": self.desc_strategy.get(),
+            "desc_f": getattr(self, 'multi_listing_desc_file_path', ""),
+            "drafts_multiplier": self.drafts_multiplier_ent.get()
         }
         path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON Files", "*.json")], parent=self.form)
         if path:
@@ -1215,6 +1240,19 @@ class ControlPanel:
             self.tags_ent.delete(0, 'end')
             self.tags_ent.insert(0, details.get("tags", ""))
 
+            self.title_strategy.set(details.get("title_strat", "manual"))
+            self.multi_listing_title_file_path = details.get("title_f", "")
+            if self.multi_listing_title_file_path:
+                self.lbl_title_file_status.config(text=f"List Loaded: {os.path.basename(self.multi_listing_title_file_path)}")
+
+            self.desc_strategy.set(details.get("desc_strat", "manual"))
+            self.multi_listing_desc_file_path = details.get("desc_f", "")
+            if self.multi_listing_desc_file_path:
+                self.lbl_desc_file_status.config(text=f"List Loaded: {os.path.basename(self.multi_listing_desc_file_path)}")
+
+            self.drafts_multiplier_ent.delete(0, 'end')
+            self.drafts_multiplier_ent.insert(0, details.get("drafts_multiplier", "1"))
+
             self.loc_strategy.set(details.get("loc_strat", "manual"))
 
             self.loc_ent.delete(0, 'end')
@@ -1235,6 +1273,8 @@ class ControlPanel:
     def commit_bulk_listing_task(self, profiles):
         strat = self.loc_strategy.get()
         title_strat = self.title_strategy.get()
+        desc_strat = getattr(self, 'desc_strategy', StringVar(value="manual")).get()
+
         details = {
             "title": self.title_ent.get(), "price": self.price_ent.get(), "category": self.cat_var.get(),
             "condition": self.cond_var.get(), "availability": self.avail_var.get(), "desc": self.desc_ent.get("1.0", "end-1c"),
@@ -1254,6 +1294,15 @@ class ControlPanel:
                 return
             details["title_type"] = "file"
             details["title_file"] = self.multi_listing_title_file_path
+
+        if desc_strat == "manual":
+            details["desc_type"] = "manual"
+        else:
+            if not hasattr(self, 'multi_listing_desc_file_path') or not self.multi_listing_desc_file_path:
+                show_alert(self.form, "Strategy Error", "List strategy selected for description but no text file provided.", "error")
+                return
+            details["desc_type"] = "file"
+            details["desc_file"] = self.multi_listing_desc_file_path
 
         try:
             details["drafts_multiplier"] = int(self.drafts_multiplier_ent.get())

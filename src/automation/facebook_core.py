@@ -82,6 +82,7 @@ from PIL import Image
 import os
 import uuid
 import tempfile
+import shutil
 
 def perform_listing(driver, details, p_name, state):
     print(f"🛒 [{p_name}] Starting UI-based listing process...")
@@ -96,6 +97,18 @@ def perform_listing(driver, details, p_name, state):
     else:
         titles_list = [details.get("title", "Listing")]
 
+    descriptions_list = []
+    if details.get("desc_type") == "file":
+        try:
+            with open(details["desc_file"], "r", encoding="utf-8") as f:
+                content = f.read()
+                # Split by comma as requested
+                descriptions_list = [d.strip() for d in content.split(",") if d.strip()]
+        except Exception:
+            descriptions_list = [details.get("desc", "")]
+    else:
+        descriptions_list = [details.get("desc", "")]
+
     drafts_multiplier = details.get("drafts_multiplier", 1)
     original_images = details.get('images', [])
     direct_publish = details.get('direct_publish', False)
@@ -106,9 +119,24 @@ def perform_listing(driver, details, p_name, state):
 
         print(f"\n--- [{p_name}] Processing Item {i+1} of {drafts_multiplier} ---")
 
-        current_title = random.choice(titles_list)
+        current_title = random.choice(titles_list) if titles_list else "Listing"
+        current_desc = random.choice(descriptions_list) if descriptions_list else ""
         current_images = original_images.copy()
         random.shuffle(current_images)
+
+        # Copy images to temp dir with random names before upload to bypass hash checks
+        temp_dir = tempfile.gettempdir()
+        randomized_image_paths = []
+        for img_path in current_images:
+            ext = os.path.splitext(img_path)[1]
+            rand_name = f"fb_img_{uuid.uuid4().hex[:10]}{ext}"
+            new_path = os.path.join(temp_dir, rand_name)
+            try:
+                shutil.copy2(img_path, new_path)
+                randomized_image_paths.append(new_path)
+            except Exception as e:
+                print(f"[{p_name}] Failed to randomize image name: {e}")
+                randomized_image_paths.append(img_path)
 
         try:
             print(f"[{p_name}] Constructing Marketplace Listing UI...")
@@ -116,8 +144,16 @@ def perform_listing(driver, details, p_name, state):
             wait_for_page_load(driver, state)
             time.sleep(4)
 
-            wait_and_find(driver, "//input[@type='file']", state).send_keys("\n".join(current_images))
+            wait_and_find(driver, "//input[@type='file']", state).send_keys("\n".join(randomized_image_paths))
             time.sleep(5)
+
+            # Clean up temp renamed images
+            for path in randomized_image_paths:
+                if path not in current_images:
+                    try:
+                        os.remove(path)
+                    except:
+                        pass
 
             try:
                 # Highly robust Javascript fallback for Title
@@ -238,7 +274,7 @@ def perform_listing(driver, details, p_name, state):
             try:
                 desc_box = wait_and_find(driver, "//label[@aria-label='Description']//textarea | //span[contains(text(), 'Description')]/following::textarea[1]", state, timeout=5)
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", desc_box)
-                human_type(desc_box, details['desc'], fast=True, state_module=state)
+                human_type(desc_box, current_desc, fast=True, state_module=state)
                 time.sleep(1)
             except Exception as e:
                 print(f"[{p_name}] Description field skipped: {e}")

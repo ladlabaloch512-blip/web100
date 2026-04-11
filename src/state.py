@@ -2,6 +2,7 @@ GLOBAL_STOP = False
 TASK_QUEUE = []
 ACTIVE_DRIVERS = []
 HEADLESS_MODE = False
+DISABLE_IMAGES = False
 
 # Live Messenger State
 MESSENGER_ALERTS = []

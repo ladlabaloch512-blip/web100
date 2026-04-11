@@ -6,6 +6,7 @@ import json
 import urllib.parse
 import undetected_chromedriver as uc
 import src.db_manager.database as db
+import tempfile
 
 class MarketplaceLister:
     CATEGORY_MAP = {
@@ -365,6 +366,19 @@ def perform_api_listing(driver, details, p_name, state):
     else:
         titles_list = [details.get("title", "Listing")]
 
+    # Handle desc strategies
+    descriptions_list = []
+    if details.get("desc_type") == "file":
+        try:
+            with open(details["desc_file"], "r", encoding="utf-8") as f:
+                content = f.read()
+                # Split by comma as requested
+                descriptions_list = [d.strip() for d in content.split(",") if d.strip()]
+        except Exception:
+            descriptions_list = [details.get("desc", "")]
+    else:
+        descriptions_list = [details.get("desc", "")]
+
     action = "publish" if details.get("direct_publish") else "draft"
 
     for i in range(drafts_count):
@@ -372,16 +386,43 @@ def perform_api_listing(driver, details, p_name, state):
             break
 
         current_title = random.choice(titles_list) if titles_list else "Listing"
+        current_desc = random.choice(descriptions_list) if descriptions_list else ""
 
         current_images = original_images.copy()
         if drafts_count > 1:
             random.shuffle(current_images)
 
+        # Copy images to temp dir with random names before upload to bypass hash checks
+        import shutil
+        temp_dir = tempfile.gettempdir()
+        randomized_image_paths = []
+        for img_path in current_images:
+            import uuid
+            import os
+            ext = os.path.splitext(img_path)[1]
+            rand_name = f"fb_img_{uuid.uuid4().hex[:10]}{ext}"
+            new_path = os.path.join(temp_dir, rand_name)
+            try:
+                shutil.copy2(img_path, new_path)
+                randomized_image_paths.append(new_path)
+            except Exception as e:
+                print(f"[{p_name}] Failed to randomize image name: {e}")
+                randomized_image_paths.append(img_path)
+
         # Update details clone for this run
         run_details = details.copy()
-        run_details['images'] = current_images
+        run_details['images'] = randomized_image_paths
+        run_details['description'] = current_desc
 
         success = lister.create_listing(driver, p_name, run_details, action=action, current_title=current_title)
+
+        # Clean up temp renamed images
+        for path in randomized_image_paths:
+            if path not in current_images:
+                try:
+                    os.remove(path)
+                except:
+                    pass
 
         if success:
             state.update_status(p_name, f"✅ API {action.capitalize()}ed")

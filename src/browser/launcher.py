@@ -48,12 +48,13 @@ def launch_browser(profile_name, base_path, state_module):
     # Eager loading
     options.page_load_strategy = 'eager'
 
-    # Disable Images/CSS
-    prefs = {
-        "profile.managed_default_content_settings.images": 2,
-        "profile.managed_default_content_settings.stylesheets": 2
-    }
-    options.add_experimental_option("prefs", prefs)
+    # Disable Images/CSS (Optional for performance)
+    if getattr(state_module, "DISABLE_IMAGES", False):
+        prefs = {
+            "profile.managed_default_content_settings.images": 2,
+            "profile.managed_default_content_settings.stylesheets": 2
+        }
+        options.add_experimental_option("prefs", prefs)
 
     # Zero-storage and crashpad optimizations
     options.add_argument("--disk-cache-size=1")
