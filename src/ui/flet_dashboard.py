@@ -222,7 +222,7 @@ def main(page: ft.Page):
         ft.Row([modern_btn("Browse Titles File (.txt)", bgcolor="#EDF2F7", text_color=C_TEXT_DARK, height=32, on_click=lambda e: title_fp.pick_files(allowed_extensions=["txt"])), lbl_title_file := ft.Text("Status: Manual Mode", color=C_PRIMARY, size=12, italic=True)]),
     ], spacing=2))
 
-    def on_title_picked(e: ft.FilePickerResultEvent):
+    def on_title_picked(e):
         if e.files:
             app_state["title_file"] = e.files[0].path
             lbl_title_file.value = f"Loaded: {e.files[0].name}"
@@ -235,7 +235,7 @@ def main(page: ft.Page):
     price_ent = ft.TextField(hint_text="e.g. 50", width=120, height=40, text_size=13, border_radius=6, border_color="#CBD5E0", content_padding=10, color=ft.Colors.BLACK87)
 
     lbl_img_count = ft.Text("0 Assets Selected", color=C_PRIMARY, weight=ft.FontWeight.BOLD, size=13)
-    def on_imgs_picked(e: ft.FilePickerResultEvent):
+    def on_imgs_picked(e):
         if e.files:
             app_state["selected_images"].extend([f.path for f in e.files])
             lbl_img_count.value = f"{len(app_state['selected_images'])} Assets Selected"
@@ -259,7 +259,7 @@ def main(page: ft.Page):
         ft.Row([modern_btn("Browse Descriptions File (.txt)", bgcolor="#EDF2F7", text_color=C_TEXT_DARK, height=32, on_click=lambda e: desc_fp.pick_files(allowed_extensions=["txt"])), lbl_desc_file := ft.Text("Status: Manual Mode", color=C_PRIMARY, size=12, italic=True)]),
     ], spacing=2))
 
-    def on_desc_picked(e: ft.FilePickerResultEvent):
+    def on_desc_picked(e):
         if e.files:
             app_state["desc_file"] = e.files[0].path
             lbl_desc_file.value = f"Loaded: {e.files[0].name}"
@@ -277,7 +277,7 @@ def main(page: ft.Page):
         ft.Radio(value="auto", label="Auto-Randomize from list (.txt) per profile", label_style=ft.TextStyle(size=13, color=C_TEXT_DARK)),
         ft.Row([modern_btn("Browse Locations File (.txt)", bgcolor="#EDF2F7", text_color=C_TEXT_DARK, height=32, on_click=lambda e: loc_fp.pick_files(allowed_extensions=["txt"])), lbl_loc_file := ft.Text("Status: Manual Mode", color=C_PRIMARY, size=12, italic=True)]),
     ], spacing=2))
-    def on_loc_picked(e: ft.FilePickerResultEvent):
+    def on_loc_picked(e):
         if e.files:
             app_state["loc_file"] = e.files[0].path
             lbl_loc_file.value = f"Loaded: {e.files[0].name}"
@@ -294,7 +294,7 @@ def main(page: ft.Page):
     direct_pub_var = ft.Checkbox(label="Publish Directly (Skip Drafts)", label_style=ft.TextStyle(color=C_DANGER, weight=ft.FontWeight.BOLD, size=12))
 
     def load_config_template(e):
-        def on_config_picked(evt: ft.FilePickerResultEvent):
+        def on_config_picked(evt):
             if evt.files:
                 try:
                     with open(evt.files[0].path, 'r') as f:
@@ -337,7 +337,7 @@ def main(page: ft.Page):
         config_fp.pick_files(allowed_extensions=["json"])
 
     def save_config_template(e):
-        def on_config_saved(evt: ft.FilePickerResultEvent):
+        def on_config_saved(evt):
             if evt.path:
                 path = evt.path if evt.path.endswith('.json') else f"{evt.path}.json"
                 details = {
@@ -407,7 +407,7 @@ def main(page: ft.Page):
     def prepare_login_queued(e):
         selected = get_selected_profiles()
         if not selected: return
-        def on_picked(res: ft.FilePickerResultEvent):
+        def on_picked(res):
             if res.files:
                 with open(res.files[0].path, "r") as f:
                     ids = [line.strip().split(",") for line in f if "," in line]
@@ -460,7 +460,7 @@ def main(page: ft.Page):
                 hide_dialog(create_dlg)
 
                 # Use Flet's folder picker for shortcut destination
-                def on_folder_picked(evt: ft.FilePickerResultEvent):
+                def on_folder_picked(evt):
                     if evt.path:
                         shortcut_dir = evt.path
                         existing = len([f for f in os.listdir(state.BASE_PATH) if os.path.isdir(os.path.join(state.BASE_PATH, f))])
@@ -505,7 +505,7 @@ def main(page: ft.Page):
     def export_profiles(e):
         selected = get_selected_profiles()
         if not selected: return
-        def on_folder_picked(evt: ft.FilePickerResultEvent):
+        def on_folder_picked(evt):
             if evt.path:
                 dest_dir = evt.path
                 import shutil
@@ -526,7 +526,7 @@ def main(page: ft.Page):
         folder_fp.get_directory_path(dialog_title="Select Destination to Export Profiles")
 
     def import_profiles(e):
-        def on_folder_picked(evt: ft.FilePickerResultEvent):
+        def on_folder_picked(evt):
             if evt.path:
                 src_dir = evt.path
                 import shutil
@@ -745,7 +745,7 @@ def main(page: ft.Page):
 
     # Initialize Base Path & Build UI
     if not state.BASE_PATH or not os.path.exists(state.BASE_PATH):
-        def on_dialog_result(e: ft.FilePickerResultEvent):
+        def on_dialog_result(e):
             if e.path:
                 state.BASE_PATH = e.path
                 state.app_config["profiles_dir"] = e.path

@@ -41,4 +41,8 @@ if __name__ == "__main__":
         if not is_valid:
             sys.exit(0)
 
-    ft.app(target=flet_main)
+    try:
+        ft.app(target=flet_main)
+    except AttributeError:
+        # Fallback for Flet >= 0.80+ if app() is deprecated entirely
+        ft.run(flet_main)
