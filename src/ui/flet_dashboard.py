@@ -214,77 +214,87 @@ def main(page: ft.Page):
     marketplace_categories = ["Tools", "Furniture", "Household", "Garden", "Appliances", "Video Games", "Books, Movies & Music", "Bags & Luggage", "Women's clothing & shoes", "Men's clothing & shoes", "Jewelry & Accessories", "Health & beauty", "Pet Supplies", "Baby & kids", "Toys & Games", "Electronics & computers", "Mobile phones", "Bicycles", "Arts & Crafts", "Sports & Outdoors", "Auto parts", "Musical Instruments", "Antiques & Collectibles", "Garage Sale", "Miscellaneous"]
     marketplace_conditions = ["New", "Used - Like New", "Used - Good", "Used - Fair"]
 
+    title_fp = ft.FilePicker()
+    page.overlay.append(title_fp)
+
+    def browse_titles(e):
+        files = title_fp.pick_files(allowed_extensions=["txt"])
+        if files:
+            app_state["title_file"] = files[0].path
+            lbl_title_file.value = f"Loaded: {files[0].name}"
+            title_strat.value = "auto"
+            page.update()
+
     title_strat = ft.RadioGroup(value="manual", content=ft.Column([
         ft.Radio(value="manual", label="Manual Single Title", label_style=ft.TextStyle(size=13, color=C_TEXT_DARK)),
         title_ent := ft.TextField(hint_text="Enter product title...", height=40, text_size=13, border_radius=6, border_color="#CBD5E0", content_padding=10, color=ft.Colors.BLACK87),
         ft.Container(height=5),
         ft.Radio(value="auto", label="Auto-Randomize Titles from list (.txt)", label_style=ft.TextStyle(size=13, color=C_TEXT_DARK)),
-        ft.Row([modern_btn("Browse Titles File (.txt)", bgcolor="#EDF2F7", text_color=C_TEXT_DARK, height=32, on_click=lambda e: title_fp.pick_files(allowed_extensions=["txt"])), lbl_title_file := ft.Text("Status: Manual Mode", color=C_PRIMARY, size=12, italic=True)]),
+        ft.Row([modern_btn("Browse Titles File (.txt)", bgcolor="#EDF2F7", text_color=C_TEXT_DARK, height=32, on_click=browse_titles), lbl_title_file := ft.Text("Status: Manual Mode", color=C_PRIMARY, size=12, italic=True)]),
     ], spacing=2))
-
-    def on_title_picked(e):
-        if e.files:
-            app_state["title_file"] = e.files[0].path
-            lbl_title_file.value = f"Loaded: {e.files[0].name}"
-            title_strat.value = "auto"
-            page.update()
-    title_fp = ft.FilePicker(on_result=on_title_picked)
-    page.overlay.append(title_fp)
 
     drafts_mult_ent = ft.TextField(value="1", width=120, height=40, text_size=13, border_radius=6, border_color="#CBD5E0", content_padding=10, color=ft.Colors.BLACK87)
     price_ent = ft.TextField(hint_text="e.g. 50", width=120, height=40, text_size=13, border_radius=6, border_color="#CBD5E0", content_padding=10, color=ft.Colors.BLACK87)
 
     lbl_img_count = ft.Text("0 Assets Selected", color=C_PRIMARY, weight=ft.FontWeight.BOLD, size=13)
-    def on_imgs_picked(e):
-        if e.files:
-            app_state["selected_images"].extend([f.path for f in e.files])
+    imgs_fp = ft.FilePicker()
+    page.overlay.append(imgs_fp)
+
+    def pick_images(e):
+        files = imgs_fp.pick_files(allow_multiple=True)
+        if files:
+            app_state["selected_images"].extend([f.path for f in files])
             lbl_img_count.value = f"{len(app_state['selected_images'])} Assets Selected"
             page.update()
-    imgs_fp = ft.FilePicker(on_result=on_imgs_picked)
-    page.overlay.append(imgs_fp)
+
     def clear_imgs(e):
         app_state["selected_images"].clear()
         lbl_img_count.value = "0 Assets Selected"
         page.update()
 
-    tab1_basic = ft.Container(padding=ft.Padding(left=0, top=15, right=0, bottom=10), content=ft.Column([form_label("Product Title Strategy:"), title_strat, ft.Container(height=10), ft.Row([ft.Column([form_label("Drafts Multiplier:"), ft.Text("How many drafts per profile?", size=11, color=C_TEXT_MUTED), drafts_mult_ent], expand=1), ft.Column([form_label("Product Price ($):"), ft.Text("Listing price", size=11, color=C_TEXT_MUTED), price_ent], expand=1)]), ft.Container(height=10), ft.Row([form_label("Product Visual Assets (Multiple Images):"), modern_btn("Clear All", bgcolor="#FFF5F5", text_color=C_DANGER, height=28, on_click=clear_imgs)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN), ft.Container(content=ft.Column([ft.Icon(ft.Icons.ADD_PHOTO_ALTERNATE, color=C_PRIMARY, size=32), lbl_img_count], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER), height=120, border=ft.Border(*[ft.BorderSide(2, "#E2E8F0")]*4), border_radius=8, alignment=ft.Alignment(0,0), ink=True, bgcolor="#F8FAFC", on_click=lambda e: imgs_fp.pick_files(allow_multiple=True))], scroll=ft.ScrollMode.AUTO))
+    tab1_basic = ft.Container(padding=ft.Padding(left=0, top=15, right=0, bottom=10), content=ft.Column([form_label("Product Title Strategy:"), title_strat, ft.Container(height=10), ft.Row([ft.Column([form_label("Drafts Multiplier:"), ft.Text("How many drafts per profile?", size=11, color=C_TEXT_MUTED), drafts_mult_ent], expand=1), ft.Column([form_label("Product Price ($):"), ft.Text("Listing price", size=11, color=C_TEXT_MUTED), price_ent], expand=1)]), ft.Container(height=10), ft.Row([form_label("Product Visual Assets (Multiple Images):"), modern_btn("Clear All", bgcolor="#FFF5F5", text_color=C_DANGER, height=28, on_click=clear_imgs)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN), ft.Container(content=ft.Column([ft.Icon(ft.Icons.ADD_PHOTO_ALTERNATE, color=C_PRIMARY, size=32), lbl_img_count], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER), height=120, border=ft.Border(*[ft.BorderSide(2, "#E2E8F0")]*4), border_radius=8, alignment=ft.Alignment(0,0), ink=True, bgcolor="#F8FAFC", on_click=pick_images)], scroll=ft.ScrollMode.AUTO))
 
     cat_var = ft.Dropdown(options=[ft.dropdown.Option(cat) for cat in marketplace_categories], value="Tools", height=45, text_size=13, border_color="#CBD5E0", border_radius=6, color=ft.Colors.BLACK87)
     cond_var = ft.Dropdown(options=[ft.dropdown.Option(cond) for cond in marketplace_conditions], value="New", height=45, text_size=13, border_color="#CBD5E0", border_radius=6, color=ft.Colors.BLACK87)
+
+    desc_fp = ft.FilePicker()
+    page.overlay.append(desc_fp)
+
+    def browse_desc(e):
+        files = desc_fp.pick_files(allowed_extensions=["txt"])
+        if files:
+            app_state["desc_file"] = files[0].path
+            lbl_desc_file.value = f"Loaded: {files[0].name}"
+            desc_strat.value = "auto"
+            page.update()
 
     desc_strat = ft.RadioGroup(value="manual", content=ft.Column([
         ft.Radio(value="manual", label="Manual Single Description", label_style=ft.TextStyle(size=13, color=C_TEXT_DARK)),
         desc_ent := ft.TextField(hint_text="Write a detailed description...", multiline=True, min_lines=4, max_lines=4, text_size=13, border_color="#CBD5E0", border_radius=6, color=ft.Colors.BLACK87),
         ft.Radio(value="auto", label="Auto-Randomize Descriptions (.txt) [Comma separated]:", label_style=ft.TextStyle(size=13, color=C_TEXT_DARK)),
-        ft.Row([modern_btn("Browse Descriptions File (.txt)", bgcolor="#EDF2F7", text_color=C_TEXT_DARK, height=32, on_click=lambda e: desc_fp.pick_files(allowed_extensions=["txt"])), lbl_desc_file := ft.Text("Status: Manual Mode", color=C_PRIMARY, size=12, italic=True)]),
+        ft.Row([modern_btn("Browse Descriptions File (.txt)", bgcolor="#EDF2F7", text_color=C_TEXT_DARK, height=32, on_click=browse_desc), lbl_desc_file := ft.Text("Status: Manual Mode", color=C_PRIMARY, size=12, italic=True)]),
     ], spacing=2))
-
-    def on_desc_picked(e):
-        if e.files:
-            app_state["desc_file"] = e.files[0].path
-            lbl_desc_file.value = f"Loaded: {e.files[0].name}"
-            desc_strat.value = "auto"
-            page.update()
-    desc_fp = ft.FilePicker(on_result=on_desc_picked)
-    page.overlay.append(desc_fp)
 
     tags_ent = ft.TextField(hint_text="e.g. quartz, minerals, leather, wholesale...", height=40, text_size=13, border_color="#CBD5E0", border_radius=6, content_padding=10, color=ft.Colors.BLACK87)
     tab2_taxonomy = ft.Container(padding=ft.Padding(left=0, top=15, right=0, bottom=10), content=ft.Column([form_label("Marketplace Category:"), cat_var, ft.Container(height=10), form_label("Condition Status:"), cond_var, ft.Container(height=10), form_label("Listing Description Strategy:"), desc_strat, ft.Container(height=10), form_label("Search Tags (Comma separated):"), tags_ent], scroll=ft.ScrollMode.AUTO))
+
+    loc_fp = ft.FilePicker()
+    page.overlay.append(loc_fp)
+
+    def browse_loc(e):
+        files = loc_fp.pick_files(allowed_extensions=["txt"])
+        if files:
+            app_state["loc_file"] = files[0].path
+            lbl_loc_file.value = f"Loaded: {files[0].name}"
+            loc_strat.value = "auto"
+            page.update()
 
     loc_strat = ft.RadioGroup(value="manual", content=ft.Column([
         ft.Radio(value="manual", label="Manual City Entry:", label_style=ft.TextStyle(size=13, color=C_TEXT_DARK)),
         loc_ent := ft.TextField(hint_text="e.g. New York, NY", height=40, text_size=13, border_radius=6, border_color="#CBD5E0", content_padding=10, color=ft.Colors.BLACK87),
         ft.Radio(value="auto", label="Auto-Randomize from list (.txt) per profile", label_style=ft.TextStyle(size=13, color=C_TEXT_DARK)),
-        ft.Row([modern_btn("Browse Locations File (.txt)", bgcolor="#EDF2F7", text_color=C_TEXT_DARK, height=32, on_click=lambda e: loc_fp.pick_files(allowed_extensions=["txt"])), lbl_loc_file := ft.Text("Status: Manual Mode", color=C_PRIMARY, size=12, italic=True)]),
+        ft.Row([modern_btn("Browse Locations File (.txt)", bgcolor="#EDF2F7", text_color=C_TEXT_DARK, height=32, on_click=browse_loc), lbl_loc_file := ft.Text("Status: Manual Mode", color=C_PRIMARY, size=12, italic=True)]),
     ], spacing=2))
-    def on_loc_picked(e):
-        if e.files:
-            app_state["loc_file"] = e.files[0].path
-            lbl_loc_file.value = f"Loaded: {e.files[0].name}"
-            loc_strat.value = "auto"
-            page.update()
-    loc_fp = ft.FilePicker(on_result=on_loc_picked)
-    page.overlay.append(loc_fp)
 
     avail_var = ft.Dropdown(options=[ft.dropdown.Option("List as Single Item"), ft.dropdown.Option("List as In-Stock")], value="List as Single Item", height=40, text_size=13, border_color="#CBD5E0", border_radius=6, color=ft.Colors.BLACK87)
     meet_pub = ft.Checkbox(label="Public Meetup", label_style=ft.TextStyle(size=12, color=C_TEXT_DARK))
@@ -293,72 +303,68 @@ def main(page: ft.Page):
     engine_strat = ft.RadioGroup(value="ui", content=ft.Column([ft.Radio(value="ui", label="Normal UI Automation (Standard)", label_style=ft.TextStyle(size=12, color=C_TEXT_DARK)), ft.Radio(value="api", label="Ultra Fast Injection (API Mode)", label_style=ft.TextStyle(size=12, color=C_TEXT_DARK))], spacing=2))
     direct_pub_var = ft.Checkbox(label="Publish Directly (Skip Drafts)", label_style=ft.TextStyle(color=C_DANGER, weight=ft.FontWeight.BOLD, size=12))
 
+    config_fp = ft.FilePicker()
+    save_fp = ft.FilePicker()
+    page.overlay.extend([config_fp, save_fp])
+
     def load_config_template(e):
-        def on_config_picked(evt):
-            if evt.files:
-                try:
-                    with open(evt.files[0].path, 'r') as f:
-                        details = json.load(f)
-                    title_ent.value = details.get("title", "")
-                    price_ent.value = details.get("price", "")
-                    cat_var.value = details.get("category", "Tools")
-                    cond_var.value = details.get("condition", "New")
-                    avail_var.value = details.get("avail", "List as Single Item")
-                    desc_ent.value = details.get("desc", "")
-                    tags_ent.value = details.get("tags", "")
+        files = config_fp.pick_files(allowed_extensions=["json"])
+        if files:
+            try:
+                with open(files[0].path, 'r') as f:
+                    details = json.load(f)
+                title_ent.value = details.get("title", "")
+                price_ent.value = details.get("price", "")
+                cat_var.value = details.get("category", "Tools")
+                cond_var.value = details.get("condition", "New")
+                avail_var.value = details.get("avail", "List as Single Item")
+                desc_ent.value = details.get("desc", "")
+                tags_ent.value = details.get("tags", "")
 
-                    title_strat.value = details.get("title_strat", "manual")
-                    app_state["title_file"] = details.get("title_f", "")
-                    if app_state["title_file"]: lbl_title_file.value = f"Loaded: {os.path.basename(app_state['title_file'])}"
+                title_strat.value = details.get("title_strat", "manual")
+                app_state["title_file"] = details.get("title_f", "")
+                if app_state["title_file"]: lbl_title_file.value = f"Loaded: {os.path.basename(app_state['title_file'])}"
 
-                    desc_strat.value = details.get("desc_strat", "manual")
-                    app_state["desc_file"] = details.get("desc_f", "")
-                    if app_state["desc_file"]: lbl_desc_file.value = f"Loaded: {os.path.basename(app_state['desc_file'])}"
+                desc_strat.value = details.get("desc_strat", "manual")
+                app_state["desc_file"] = details.get("desc_f", "")
+                if app_state["desc_file"]: lbl_desc_file.value = f"Loaded: {os.path.basename(app_state['desc_file'])}"
 
-                    loc_strat.value = details.get("loc_strat", "manual")
-                    loc_ent.value = details.get("loc", "")
-                    app_state["loc_file"] = details.get("loc_f", "")
-                    if app_state["loc_file"]: lbl_loc_file.value = f"Loaded: {os.path.basename(app_state['loc_file'])}"
+                loc_strat.value = details.get("loc_strat", "manual")
+                loc_ent.value = details.get("loc", "")
+                app_state["loc_file"] = details.get("loc_f", "")
+                if app_state["loc_file"]: lbl_loc_file.value = f"Loaded: {os.path.basename(app_state['loc_file'])}"
 
-                    meet_pub.value = details.get("meet_p", False)
-                    meet_door.value = details.get("door_p", False)
-                    direct_pub_var.value = details.get("direct_publish", False)
-                    engine_strat.value = details.get("engine", "normal")
-                    drafts_mult_ent.value = details.get("drafts_multiplier", "1")
+                meet_pub.value = details.get("meet_p", False)
+                meet_door.value = details.get("door_p", False)
+                direct_pub_var.value = details.get("direct_publish", False)
+                engine_strat.value = details.get("engine", "normal")
+                drafts_mult_ent.value = details.get("drafts_multiplier", "1")
 
-                    app_state["selected_images"] = details.get("imgs", [])
-                    lbl_img_count.value = f"{len(app_state['selected_images'])} Assets Selected"
-                    page.update()
-                except Exception as err:
-                    show_alert("Error", f"Failed to load config: {err}", "error")
-        config_fp = ft.FilePicker(on_result=on_config_picked)
-        page.overlay.append(config_fp)
-        page.update()
-        config_fp.pick_files(allowed_extensions=["json"])
+                app_state["selected_images"] = details.get("imgs", [])
+                lbl_img_count.value = f"{len(app_state['selected_images'])} Assets Selected"
+                page.update()
+            except Exception as err:
+                show_alert("Error", f"Failed to load config: {err}", "error")
 
     def save_config_template(e):
-        def on_config_saved(evt):
-            if evt.path:
-                path = evt.path if evt.path.endswith('.json') else f"{evt.path}.json"
-                details = {
-                    "title": title_ent.value, "price": price_ent.value, "category": cat_var.value, "condition": cond_var.value,
-                    "avail": avail_var.value, "desc": desc_ent.value, "tags": tags_ent.value, "loc_strat": loc_strat.value,
-                    "loc": loc_ent.value, "loc_f": app_state["loc_file"], "meet_p": meet_pub.value,
-                    "door_p": meet_door.value, "imgs": app_state["selected_images"], "direct_publish": direct_pub_var.value,
-                    "engine": engine_strat.value,
-                    "title_strat": title_strat.value, "title_f": app_state["title_file"],
-                    "desc_strat": desc_strat.value, "desc_f": app_state["desc_file"],
-                    "drafts_multiplier": drafts_mult_ent.value
-                }
-                try:
-                    with open(path, 'w') as f: json.dump(details, f)
-                    show_alert("Saved", "Configuration saved successfully.", "success")
-                except Exception as err:
-                    show_alert("Error", f"Failed to save config: {err}", "error")
-        save_fp = ft.FilePicker(on_result=on_config_saved)
-        page.overlay.append(save_fp)
-        page.update()
-        save_fp.save_file(dialog_title="Save Config As", allowed_extensions=["json"], file_name="listing_config.json")
+        path = save_fp.save_file(dialog_title="Save Config As", allowed_extensions=["json"], file_name="listing_config.json")
+        if path:
+            path = path if path.endswith('.json') else f"{path}.json"
+            details = {
+                "title": title_ent.value, "price": price_ent.value, "category": cat_var.value, "condition": cond_var.value,
+                "avail": avail_var.value, "desc": desc_ent.value, "tags": tags_ent.value, "loc_strat": loc_strat.value,
+                "loc": loc_ent.value, "loc_f": app_state["loc_file"], "meet_p": meet_pub.value,
+                "door_p": meet_door.value, "imgs": app_state["selected_images"], "direct_publish": direct_pub_var.value,
+                "engine": engine_strat.value,
+                "title_strat": title_strat.value, "title_f": app_state["title_file"],
+                "desc_strat": desc_strat.value, "desc_f": app_state["desc_file"],
+                "drafts_multiplier": drafts_mult_ent.value
+            }
+            try:
+                with open(path, 'w') as f: json.dump(details, f)
+                show_alert("Saved", "Configuration saved successfully.", "success")
+            except Exception as err:
+                show_alert("Error", f"Failed to save config: {err}", "error")
 
     tab3_settings = ft.Container(padding=ft.Padding(left=0, top=15, right=0, bottom=10), content=ft.Column([form_label("Geographic Location Strategy:"), loc_strat, ft.Container(height=15), ft.Row([ft.Column([form_label("Fulfillment Preferences:"), avail_var, ft.Row([meet_pub, meet_door])], expand=1), ft.Column([form_label("Execution Mode & Engine:"), engine_strat, direct_pub_var], expand=1)]), ft.Divider(color="#E2E8F0"), form_label("Templates Management:"), ft.Row([modern_btn("Load Config Template", icon=ft.Icons.FOLDER_OPEN, bgcolor="#805AD5", expand=True, on_click=load_config_template), modern_btn("Save Current Config", icon=ft.Icons.SAVE, bgcolor=C_WARNING, expand=True, on_click=save_config_template)])], scroll=ft.ScrollMode.AUTO))
     config_content_area = ft.Container(content=tab1_basic, expand=True)
@@ -404,21 +410,20 @@ def main(page: ft.Page):
         manual_dlg = ft.AlertDialog(title=ft.Text("Manual Launch Config", weight=ft.FontWeight.BOLD), content=url_strat, actions=[modern_btn("Add to Queue", on_click=on_submit)])
         show_dialog(manual_dlg)
 
+    login_fp = ft.FilePicker()
+    page.overlay.append(login_fp)
+
     def prepare_login_queued(e):
         selected = get_selected_profiles()
         if not selected: return
-        def on_picked(res):
-            if res.files:
-                with open(res.files[0].path, "r") as f:
-                    ids = [line.strip().split(",") for line in f if "," in line]
-                for i, p_name in enumerate(selected):
-                    if i < len(ids): state.TASK_QUEUE.append((p_name, "login", None, ids[i][0], ids[i][1]))
-                update_queue_display()
-                show_alert("Added to Queue", "Multi-login queued.", "success")
-        login_fp = ft.FilePicker(on_result=on_picked)
-        page.overlay.append(login_fp)
-        page.update()
-        login_fp.pick_files(allowed_extensions=["txt"])
+        files = login_fp.pick_files(allowed_extensions=["txt"])
+        if files:
+            with open(files[0].path, "r") as f:
+                ids = [line.strip().split(",") for line in f if "," in line]
+            for i, p_name in enumerate(selected):
+                if i < len(ids): state.TASK_QUEUE.append((p_name, "login", None, ids[i][0], ids[i][1]))
+            update_queue_display()
+            show_alert("Added to Queue", "Multi-login queued.", "success")
 
     def prepare_human_activity_queued(e):
         selected = get_selected_profiles()
@@ -451,6 +456,9 @@ def main(page: ft.Page):
         if not selected: return
         add_to_queue(selected, "health_check")
 
+    folder_fp = ft.FilePicker()
+    page.overlay.append(folder_fp)
+
     def bulk_create_profiles(e):
         count_input = ft.TextField(label="Number of profiles to create", value="5", width=200)
         chrome_exe = ft.TextField(label="Path to Chrome.exe (for shortcuts)", value=r"C:\Program Files\Google\Chrome\Application\chrome.exe")
@@ -459,32 +467,25 @@ def main(page: ft.Page):
                 count = int(count_input.value)
                 hide_dialog(create_dlg)
 
-                # Use Flet's folder picker for shortcut destination
-                def on_folder_picked(evt):
-                    if evt.path:
-                        shortcut_dir = evt.path
-                        existing = len([f for f in os.listdir(state.BASE_PATH) if os.path.isdir(os.path.join(state.BASE_PATH, f))])
-                        for i in range(count):
-                            p_name = f"Profile {existing + i + 1}"
-                            p_path = os.path.join(state.BASE_PATH, p_name)
-                            os.makedirs(p_path, exist_ok=True)
-                            import subprocess
-                            if sys.platform == "win32":
-                                vbs_path = os.path.join(state.BASE_PATH, "temp.vbs")
-                                lnk_path = os.path.normpath(os.path.join(shortcut_dir, f"{p_name}.lnk"))
-                                vbs_code = f'Set oWS = WScript.CreateObject("WScript.Shell")\nSet oLink = oWS.CreateShortcut("{lnk_path}")\noLink.TargetPath = "{os.path.normpath(chrome_exe.value)}"\noLink.Arguments = "--user-data-dir=" & Chr(34) & "{os.path.normpath(p_path)}" & Chr(34)\noLink.Save'
-                                with open(vbs_path, "w") as f:
-                                    f.write(vbs_code)
-                                subprocess.run(["cscript", "//nologo", vbs_path], shell=True)
-                                os.remove(vbs_path)
-                            get_or_create_fingerprint(p_name, state.BASE_PATH)
-                        refresh_profiles()
-                        show_alert("Success", f"Provisioned {count} Profiles and Shortcuts.", "success")
-
-                folder_fp = ft.FilePicker(on_result=on_folder_picked)
-                page.overlay.append(folder_fp)
-                page.update()
-                folder_fp.get_directory_path(dialog_title="Select Destination Folder for Shortcuts")
+                shortcut_dir = folder_fp.get_directory_path(dialog_title="Select Destination Folder for Shortcuts")
+                if shortcut_dir:
+                    existing = len([f for f in os.listdir(state.BASE_PATH) if os.path.isdir(os.path.join(state.BASE_PATH, f))])
+                    for i in range(count):
+                        p_name = f"Profile {existing + i + 1}"
+                        p_path = os.path.join(state.BASE_PATH, p_name)
+                        os.makedirs(p_path, exist_ok=True)
+                        import subprocess
+                        if sys.platform == "win32":
+                            vbs_path = os.path.join(state.BASE_PATH, "temp.vbs")
+                            lnk_path = os.path.normpath(os.path.join(shortcut_dir, f"{p_name}.lnk"))
+                            vbs_code = f'Set oWS = WScript.CreateObject("WScript.Shell")\nSet oLink = oWS.CreateShortcut("{lnk_path}")\noLink.TargetPath = "{os.path.normpath(chrome_exe.value)}"\noLink.Arguments = "--user-data-dir=" & Chr(34) & "{os.path.normpath(p_path)}" & Chr(34)\noLink.Save'
+                            with open(vbs_path, "w") as f:
+                                f.write(vbs_code)
+                            subprocess.run(["cscript", "//nologo", vbs_path], shell=True)
+                            os.remove(vbs_path)
+                        get_or_create_fingerprint(p_name, state.BASE_PATH)
+                    refresh_profiles()
+                    show_alert("Success", f"Provisioned {count} Profiles and Shortcuts.", "success")
 
             except Exception as err: show_alert("Error", str(err), "error")
 
@@ -505,50 +506,40 @@ def main(page: ft.Page):
     def export_profiles(e):
         selected = get_selected_profiles()
         if not selected: return
-        def on_folder_picked(evt):
-            if evt.path:
-                dest_dir = evt.path
-                import shutil
-                total = len(selected)
-                for i, p_name in enumerate(selected):
-                    src_path = os.path.join(state.BASE_PATH, p_name)
-                    dst_path = os.path.join(dest_dir, p_name)
-                    try:
-                        if os.path.exists(dst_path): shutil.rmtree(dst_path)
-                        shutil.copytree(src_path, dst_path)
-                    except Exception as err:
-                        print(f"Error exporting {p_name}: {err}")
-                play_success_sound()
-                show_alert("Export Complete", f"Successfully exported {total} profiles to {dest_dir}", "success")
-        folder_fp = ft.FilePicker(on_result=on_folder_picked)
-        page.overlay.append(folder_fp)
-        page.update()
-        folder_fp.get_directory_path(dialog_title="Select Destination to Export Profiles")
+        dest_dir = folder_fp.get_directory_path(dialog_title="Select Destination to Export Profiles")
+        if dest_dir:
+            import shutil
+            total = len(selected)
+            for i, p_name in enumerate(selected):
+                src_path = os.path.join(state.BASE_PATH, p_name)
+                dst_path = os.path.join(dest_dir, p_name)
+                try:
+                    if os.path.exists(dst_path): shutil.rmtree(dst_path)
+                    shutil.copytree(src_path, dst_path)
+                except Exception as err:
+                    print(f"Error exporting {p_name}: {err}")
+            play_success_sound()
+            show_alert("Export Complete", f"Successfully exported {total} profiles to {dest_dir}", "success")
 
     def import_profiles(e):
-        def on_folder_picked(evt):
-            if evt.path:
-                src_dir = evt.path
-                import shutil
-                profiles_to_import = [f for f in os.listdir(src_dir) if os.path.isdir(os.path.join(src_dir, f)) and f.startswith("Profile")]
-                if not profiles_to_import:
-                    show_alert("No Profiles Found", "The selected folder does not contain any valid 'Profile X' folders.", "error")
-                    return
-                total = len(profiles_to_import)
-                for i, p_name in enumerate(profiles_to_import):
-                    src_path = os.path.join(src_dir, p_name)
-                    dst_path = os.path.join(state.BASE_PATH, p_name)
-                    try:
-                        if not os.path.exists(dst_path): shutil.copytree(src_path, dst_path)
-                    except Exception as err:
-                        print(f"Error importing {p_name}: {err}")
-                refresh_profiles()
-                play_success_sound()
-                show_alert("Import Complete", f"Successfully imported {total} profiles.", "success")
-        folder_fp = ft.FilePicker(on_result=on_folder_picked)
-        page.overlay.append(folder_fp)
-        page.update()
-        folder_fp.get_directory_path(dialog_title="Select Folder Containing Profiles to Import")
+        src_dir = folder_fp.get_directory_path(dialog_title="Select Folder Containing Profiles to Import")
+        if src_dir:
+            import shutil
+            profiles_to_import = [f for f in os.listdir(src_dir) if os.path.isdir(os.path.join(src_dir, f)) and f.startswith("Profile")]
+            if not profiles_to_import:
+                show_alert("No Profiles Found", "The selected folder does not contain any valid 'Profile X' folders.", "error")
+                return
+            total = len(profiles_to_import)
+            for i, p_name in enumerate(profiles_to_import):
+                src_path = os.path.join(src_dir, p_name)
+                dst_path = os.path.join(state.BASE_PATH, p_name)
+                try:
+                    if not os.path.exists(dst_path): shutil.copytree(src_path, dst_path)
+                except Exception as err:
+                    print(f"Error importing {p_name}: {err}")
+            refresh_profiles()
+            play_success_sound()
+            show_alert("Import Complete", f"Successfully imported {total} profiles.", "success")
 
     sidebar = ft.Container(
         width=260, bgcolor=C_SIDEBAR, border=border_right_only, padding=ft.Padding(left=15, top=25, right=15, bottom=20),
@@ -744,20 +735,23 @@ def main(page: ft.Page):
     body = ft.Row([sidebar, right_side], expand=True, spacing=0)
 
     # Initialize Base Path & Build UI
+    picker = ft.FilePicker()
+    page.overlay.append(picker)
+
     if not state.BASE_PATH or not os.path.exists(state.BASE_PATH):
-        def on_dialog_result(e):
-            if e.path:
-                state.BASE_PATH = e.path
-                state.app_config["profiles_dir"] = e.path
+        def open_picker_and_set(e):
+            folder_path = picker.get_directory_path()
+            if folder_path:
+                state.BASE_PATH = folder_path
+                state.app_config["profiles_dir"] = folder_path
                 state.save_config(state.app_config)
                 hide_dialog(first_run_dialog)
                 page.add(body)
                 refresh_profiles()
             else:
                 page.window.destroy()
-        picker = ft.FilePicker(on_result=on_dialog_result)
-        page.overlay.append(picker)
-        first_run_dialog = ft.AlertDialog(title=ft.Text("First Run Setup"), content=ft.Text("Please select a Master Folder where all browser profiles will be stored."), actions=[ft.TextButton("Select Folder", on_click=lambda _: picker.get_directory_path())])
+
+        first_run_dialog = ft.AlertDialog(title=ft.Text("First Run Setup"), content=ft.Text("Please select a Master Folder where all browser profiles will be stored."), actions=[ft.TextButton("Select Folder", on_click=open_picker_and_set)])
         show_dialog(first_run_dialog)
     else:
         page.add(body)
