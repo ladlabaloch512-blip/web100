@@ -735,21 +735,23 @@ def main(page: ft.Page):
     body = ft.Row([sidebar, right_side], expand=True, spacing=0)
 
     # Initialize Base Path & Build UI
-    picker = ft.FilePicker()
+    def on_init_picker_result(e):
+        if e.path:
+            state.BASE_PATH = e.path
+            state.app_config["profiles_dir"] = e.path
+            state.save_config(state.app_config)
+            hide_dialog(first_run_dialog)
+            page.add(body)
+            refresh_profiles()
+        else:
+            page.window.destroy()
+
+    picker = ft.FilePicker(on_result=on_init_picker_result)
     page.overlay.append(picker)
 
     if not state.BASE_PATH or not os.path.exists(state.BASE_PATH):
         def open_picker_and_set(e):
-            folder_path = picker.get_directory_path()
-            if folder_path:
-                state.BASE_PATH = folder_path
-                state.app_config["profiles_dir"] = folder_path
-                state.save_config(state.app_config)
-                hide_dialog(first_run_dialog)
-                page.add(body)
-                refresh_profiles()
-            else:
-                page.window.destroy()
+            picker.get_directory_path(dialog_title="Select Master Folder")
 
         first_run_dialog = ft.AlertDialog(title=ft.Text("First Run Setup"), content=ft.Text("Please select a Master Folder where all browser profiles will be stored."), actions=[ft.TextButton("Select Folder", on_click=open_picker_and_set)])
         show_dialog(first_run_dialog)
