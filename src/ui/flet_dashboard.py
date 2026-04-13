@@ -214,16 +214,19 @@ def main(page: ft.Page):
     marketplace_categories = ["Tools", "Furniture", "Household", "Garden", "Appliances", "Video Games", "Books, Movies & Music", "Bags & Luggage", "Women's clothing & shoes", "Men's clothing & shoes", "Jewelry & Accessories", "Health & beauty", "Pet Supplies", "Baby & kids", "Toys & Games", "Electronics & computers", "Mobile phones", "Bicycles", "Arts & Crafts", "Sports & Outdoors", "Auto parts", "Musical Instruments", "Antiques & Collectibles", "Garage Sale", "Miscellaneous"]
     marketplace_conditions = ["New", "Used - Like New", "Used - Good", "Used - Fair"]
 
-    title_fp = ft.FilePicker(); title_fp.on_result = on_title_picked
+    def on_title_picked(e):
+        if e.files:
+            app_state["title_file"] = e.files[0].path
+            lbl_title_file.value = f"Loaded: {e.files[0].name}"
+            title_strat.value = "auto"
+            page.update()
+
+    title_fp = ft.FilePicker()
+    title_fp.on_result = on_title_picked
     page.overlay.append(title_fp)
 
     def browse_titles(e):
-        files = title_fp.pick_files(allowed_extensions=["txt"])
-        if files:
-            app_state["title_file"] = files[0].path
-            lbl_title_file.value = f"Loaded: {files[0].name}"
-            title_strat.value = "auto"
-            page.update()
+        title_fp.pick_files(allowed_extensions=["txt"])
 
     title_strat = ft.RadioGroup(value="manual", content=ft.Column([
         ft.Radio(value="manual", label="Manual Single Title", label_style=ft.TextStyle(size=13, color=C_TEXT_DARK)),
@@ -237,15 +240,12 @@ def main(page: ft.Page):
     price_ent = ft.TextField(hint_text="e.g. 50", width=120, height=40, text_size=13, border_radius=6, border_color="#CBD5E0", content_padding=10, color=ft.Colors.BLACK87)
 
     lbl_img_count = ft.Text("0 Assets Selected", color=C_PRIMARY, weight=ft.FontWeight.BOLD, size=13)
-    imgs_fp = ft.FilePicker(); imgs_fp.on_result = on_imgs_picked
+    imgs_fp = ft.FilePicker()
+    imgs_fp.on_result = on_imgs_picked
     page.overlay.append(imgs_fp)
 
     def pick_images(e):
-        files = imgs_fp.pick_files(allow_multiple=True)
-        if files:
-            app_state["selected_images"].extend([f.path for f in files])
-            lbl_img_count.value = f"{len(app_state['selected_images'])} Assets Selected"
-            page.update()
+        imgs_fp.pick_files(allow_multiple=True)
 
     def clear_imgs(e):
         app_state["selected_images"].clear()
@@ -257,16 +257,12 @@ def main(page: ft.Page):
     cat_var = ft.Dropdown(options=[ft.dropdown.Option(cat) for cat in marketplace_categories], value="Tools", height=45, text_size=13, border_color="#CBD5E0", border_radius=6, color=ft.Colors.BLACK87)
     cond_var = ft.Dropdown(options=[ft.dropdown.Option(cond) for cond in marketplace_conditions], value="New", height=45, text_size=13, border_color="#CBD5E0", border_radius=6, color=ft.Colors.BLACK87)
 
-    desc_fp = ft.FilePicker(); desc_fp.on_result = on_desc_picked
+    desc_fp = ft.FilePicker()
+    desc_fp.on_result = on_desc_picked
     page.overlay.append(desc_fp)
 
     def browse_desc(e):
-        files = desc_fp.pick_files(allowed_extensions=["txt"])
-        if files:
-            app_state["desc_file"] = files[0].path
-            lbl_desc_file.value = f"Loaded: {files[0].name}"
-            desc_strat.value = "auto"
-            page.update()
+        desc_fp.pick_files(allowed_extensions=["txt"])
 
     desc_strat = ft.RadioGroup(value="manual", content=ft.Column([
         ft.Radio(value="manual", label="Manual Single Description", label_style=ft.TextStyle(size=13, color=C_TEXT_DARK)),
@@ -278,7 +274,8 @@ def main(page: ft.Page):
     tags_ent = ft.TextField(hint_text="e.g. quartz, minerals, leather, wholesale...", height=40, text_size=13, border_color="#CBD5E0", border_radius=6, content_padding=10, color=ft.Colors.BLACK87)
     tab2_taxonomy = ft.Container(padding=ft.Padding(left=0, top=15, right=0, bottom=10), content=ft.Column([form_label("Marketplace Category:"), cat_var, ft.Container(height=10), form_label("Condition Status:"), cond_var, ft.Container(height=10), form_label("Listing Description Strategy:"), desc_strat, ft.Container(height=10), form_label("Search Tags (Comma separated):"), tags_ent], scroll=ft.ScrollMode.AUTO))
 
-    loc_fp = ft.FilePicker(); loc_fp.on_result = on_loc_picked
+    loc_fp = ft.FilePicker()
+    loc_fp.on_result = on_loc_picked
     page.overlay.append(loc_fp)
 
     def browse_loc(e):
@@ -303,8 +300,10 @@ def main(page: ft.Page):
     engine_strat = ft.RadioGroup(value="ui", content=ft.Column([ft.Radio(value="ui", label="Normal UI Automation (Standard)", label_style=ft.TextStyle(size=12, color=C_TEXT_DARK)), ft.Radio(value="api", label="Ultra Fast Injection (API Mode)", label_style=ft.TextStyle(size=12, color=C_TEXT_DARK))], spacing=2))
     direct_pub_var = ft.Checkbox(label="Publish Directly (Skip Drafts)", label_style=ft.TextStyle(color=C_DANGER, weight=ft.FontWeight.BOLD, size=12))
 
-    config_fp = ft.FilePicker(); config_fp.on_result = on_config_picked
-    save_fp = ft.FilePicker(); save_fp.on_result = on_save_config_result
+    config_fp = ft.FilePicker()
+    config_fp.on_result = on_config_picked
+    save_fp = ft.FilePicker()
+    save_fp.on_result = on_save_config_result
     page.overlay.extend([config_fp, save_fp])
 
     def load_config_template(e):
@@ -410,7 +409,8 @@ def main(page: ft.Page):
         manual_dlg = ft.AlertDialog(title=ft.Text("Manual Launch Config", weight=ft.FontWeight.BOLD), content=url_strat, actions=[modern_btn("Add to Queue", on_click=on_submit)])
         show_dialog(manual_dlg)
 
-    login_fp = ft.FilePicker(); login_fp.on_result = on_login_picked
+    login_fp = ft.FilePicker()
+    login_fp.on_result = on_login_picked
     page.overlay.append(login_fp)
 
     def prepare_login_queued(e):
@@ -456,7 +456,8 @@ def main(page: ft.Page):
         if not selected: return
         add_to_queue(selected, "health_check")
 
-    folder_fp = ft.FilePicker(); folder_fp.on_result = on_folder_picked
+    folder_fp = ft.FilePicker()
+    folder_fp.on_result = on_folder_picked
     page.overlay.append(folder_fp)
 
     def bulk_create_profiles(e):
@@ -746,7 +747,8 @@ def main(page: ft.Page):
         else:
             page.window.destroy()
 
-    picker = ft.FilePicker(); picker.on_result = on_init_picker_result
+    picker = ft.FilePicker()
+    picker.on_result = on_init_picker_result
     page.overlay.append(picker)
 
     if not state.BASE_PATH or not os.path.exists(state.BASE_PATH):
