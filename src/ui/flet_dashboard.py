@@ -269,6 +269,13 @@ def main(page: ft.Page):
     cond_var = ft.Dropdown(options=[ft.dropdown.Option(cond) for cond in marketplace_conditions], value="New", height=45, text_size=13, border_color="#CBD5E0", border_radius=6, color=ft.Colors.BLACK87)
 
     desc_fp = ft.FilePicker()
+    def on_desc_picked(e):
+        if e.files:
+            app_state["desc_file"] = e.files[0].path
+            lbl_desc_file.value = f"Loaded: {e.files[0].name}"
+            desc_strat.value = "auto"
+            page.update()
+
     desc_fp.on_result = on_desc_picked
     page.overlay.append(desc_fp)
 
