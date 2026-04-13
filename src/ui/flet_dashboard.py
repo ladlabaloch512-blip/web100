@@ -241,6 +241,17 @@ def main(page: ft.Page):
 
     lbl_img_count = ft.Text("0 Assets Selected", color=C_PRIMARY, weight=ft.FontWeight.BOLD, size=13)
     imgs_fp = ft.FilePicker()
+    def on_imgs_picked(e):
+        if e.files:
+            app_state["selected_images"].extend([f.path for f in e.files])
+            lbl_img_count.value = f"{len(app_state['selected_images'])} Assets Selected"
+            page.update()
+    def on_imgs_picked(e):
+        if e.files:
+            app_state["selected_images"].extend([f.path for f in e.files])
+            lbl_img_count.value = f"{len(app_state['selected_images'])} Assets Selected"
+            page.update()
+
     imgs_fp.on_result = on_imgs_picked
     page.overlay.append(imgs_fp)
 
