@@ -293,6 +293,13 @@ def main(page: ft.Page):
     tab2_taxonomy = ft.Container(padding=ft.Padding(left=0, top=15, right=0, bottom=10), content=ft.Column([form_label("Marketplace Category:"), cat_var, ft.Container(height=10), form_label("Condition Status:"), cond_var, ft.Container(height=10), form_label("Listing Description Strategy:"), desc_strat, ft.Container(height=10), form_label("Search Tags (Comma separated):"), tags_ent], scroll=ft.ScrollMode.AUTO))
 
     loc_fp = ft.FilePicker()
+    def on_loc_picked(e):
+        if e.files:
+            app_state["loc_file"] = e.files[0].path
+            lbl_loc_file.value = f"Loaded: {e.files[0].name}"
+            loc_strat.value = "auto"
+            page.update()
+
     loc_fp.on_result = on_loc_picked
     page.overlay.append(loc_fp)
 
