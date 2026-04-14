@@ -326,6 +326,44 @@ def main(page: ft.Page):
     direct_pub_var = ft.Checkbox(label="Publish Directly (Skip Drafts)", label_style=ft.TextStyle(color=C_DANGER, weight=ft.FontWeight.BOLD, size=12))
 
     config_fp = ft.FilePicker()
+    def on_config_picked(e):
+        if e.files:
+            try:
+                with open(e.files[0].path, 'r') as f:
+                    details = json.load(f)
+                title_ent.value = details.get("title", "")
+                price_ent.value = details.get("price", "")
+                cat_var.value = details.get("category", "Tools")
+                cond_var.value = details.get("condition", "New")
+                avail_var.value = details.get("avail", "List as Single Item")
+                desc_ent.value = details.get("desc", "")
+                tags_ent.value = details.get("tags", "")
+
+                title_strat.value = details.get("title_strat", "manual")
+                app_state["title_file"] = details.get("title_f", "")
+                if app_state["title_file"]: lbl_title_file.value = f"Loaded: {os.path.basename(app_state['title_file'])}"
+
+                desc_strat.value = details.get("desc_strat", "manual")
+                app_state["desc_file"] = details.get("desc_f", "")
+                if app_state["desc_file"]: lbl_desc_file.value = f"Loaded: {os.path.basename(app_state['desc_file'])}"
+
+                loc_strat.value = details.get("loc_strat", "manual")
+                loc_ent.value = details.get("loc", "")
+                app_state["loc_file"] = details.get("loc_f", "")
+                if app_state["loc_file"]: lbl_loc_file.value = f"Loaded: {os.path.basename(app_state['loc_file'])}"
+
+                meet_pub.value = details.get("meet_p", False)
+                meet_door.value = details.get("door_p", False)
+                direct_pub_var.value = details.get("direct_publish", False)
+                engine_strat.value = details.get("engine", "normal")
+                drafts_mult_ent.value = details.get("drafts_multiplier", "1")
+
+                app_state["selected_images"] = details.get("imgs", [])
+                lbl_img_count.value = f"{len(app_state['selected_images'])} Assets Selected"
+                page.update()
+            except Exception as err:
+                show_alert("Error", f"Failed to load config: {err}", "error")
+
     config_fp.on_result = on_config_picked
     save_fp = ft.FilePicker()
     save_fp.on_result = on_save_config_result
